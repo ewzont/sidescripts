@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ModBan = ReplicatedStorage.Events:FindFirstChild("ModBan")
 local BanClient = ReplicatedStorage.Events:FindFirstChild("BanClient")
 local Ban = ReplicatedStorage.Events:FindFirstChild("Ban")
+local idontexploit = ReplicatedStorage.Events:FindFirstChild("idontexploit")
 
 if ModBan then
     ModBan:Destroy()
@@ -21,6 +22,9 @@ if BanClient then
 end
 if Ban then
     Ban:Destroy()
+end
+if idontexploit then
+    idontexploit:Destroy()
 end
 
 -- Wait 0.5 seconds again
