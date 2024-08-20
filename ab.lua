@@ -2,7 +2,9 @@
 local character = game.Players.LocalPlayer.Character
 
 -- Disable the "Client" script in the local character
-character.Client.Disabled = true
+if character:FindFirstChild("Client") then
+    character.Client.Disabled = true
+end
 
 -- Wait 0.25 seconds
 wait(0.25)
@@ -31,5 +33,7 @@ end
 wait(0.25)
 
 -- Enable the "Client" script in the local character again
-character.Client.Disabled = false
+if character:FindFirstChild("Client") then
+    character.Client.Disabled = false
+end
 wait(.25)
