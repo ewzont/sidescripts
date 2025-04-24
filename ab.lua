@@ -1,15 +1,10 @@
--- Define the character
 local character = game.Players.LocalPlayer.Character
 
--- Disable the "Client" script in the local character
 if character:FindFirstChild("Client") then
     character.Client.Disabled = true
 end
+task.wait()
 
--- Wait 0.25 seconds
-wait(0.25)
-
--- Remove the specified events
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ModBan = ReplicatedStorage.Events:FindFirstChild("ModBan")
 local BanClient = ReplicatedStorage.Events:FindFirstChild("BanClient")
@@ -29,11 +24,9 @@ if idontexploit then
     idontexploit:Destroy()
 end
 
--- Wait 0.5 seconds again
-wait(0.25)
+task.wait()
 
--- Enable the "Client" script in the local character again
 if character:FindFirstChild("Client") then
     character.Client.Disabled = false
 end
-wait(.25)
+task.wait()
