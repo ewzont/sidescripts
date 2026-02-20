@@ -3833,7 +3833,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			DropdownSearch.PlaceholderText = "Search..."
 			DropdownSearch.Text = ""
 			DropdownSearch.Font = Enum.Font.Gotham
-			DropdownSearch.TextSize = 12
+			DropdownSearch.TextSize = 13
 			DropdownSearch.TextXAlignment = Enum.TextXAlignment.Left
 			DropdownSearch.TextColor3 = SelectedTheme.TextColor
 			DropdownSearch.PlaceholderColor3 = SelectedTheme.PlaceholderColor
@@ -3848,10 +3848,38 @@ function RayfieldLibrary:CreateWindow(Settings)
 			DropdownSearchCorner.CornerRadius = UDim.new(0, 6)
 			DropdownSearchCorner.Parent = DropdownSearch
 
+			local DropdownSearchPadding = Instance.new("UIPadding")
+			DropdownSearchPadding.PaddingLeft = UDim.new(0, 30)
+			DropdownSearchPadding.PaddingRight = UDim.new(0, 8)
+			DropdownSearchPadding.Parent = DropdownSearch
+
 			local DropdownSearchStroke = Instance.new("UIStroke")
 			DropdownSearchStroke.Color = SelectedTheme.InputStroke
 			DropdownSearchStroke.Thickness = 1
 			DropdownSearchStroke.Parent = DropdownSearch
+
+			local DropdownSearchIcon = Instance.new("ImageLabel")
+			DropdownSearchIcon.Name = "SearchIcon"
+			DropdownSearchIcon.BackgroundTransparency = 1
+			DropdownSearchIcon.Size = UDim2.fromOffset(16, 16)
+			DropdownSearchIcon.Position = UDim2.new(0, 9, 0.5, -8)
+			DropdownSearchIcon.ZIndex = 52
+			DropdownSearchIcon.ImageColor3 = SelectedTheme.PlaceholderColor
+			DropdownSearchIcon.ImageTransparency = 0.2
+			DropdownSearchIcon.Parent = DropdownSearch
+
+			if Topbar and Topbar:FindFirstChild("Search") then
+				DropdownSearchIcon.Image = Topbar.Search.Image
+				DropdownSearchIcon.ImageRectOffset = Topbar.Search.ImageRectOffset
+				DropdownSearchIcon.ImageRectSize = Topbar.Search.ImageRectSize
+			elseif Icons then
+				local success, asset = pcall(getIcon, "search")
+				if success and asset then
+					DropdownSearchIcon.Image = "rbxassetid://" .. asset.id
+					DropdownSearchIcon.ImageRectOffset = asset.imageRectOffset
+					DropdownSearchIcon.ImageRectSize = asset.imageRectSize
+				end
+			end
 
 			local function UpdateDropdownSearchFilter()
 				local query = string.lower(DropdownSearch.Text or "")
@@ -4290,6 +4318,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 				DropdownSearch.PlaceholderColor3 = SelectedTheme.PlaceholderColor
 				DropdownSearch.BackgroundColor3 = SelectedTheme.InputBackground
 				DropdownSearchStroke.Color = SelectedTheme.InputStroke
+				DropdownSearchIcon.ImageColor3 = SelectedTheme.PlaceholderColor
 				TweenService:Create(
 					Dropdown,
 					TweenInfo.new(0.4, Enum.EasingStyle.Exponential),
