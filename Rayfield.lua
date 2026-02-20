@@ -3838,8 +3838,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 			DropdownSearch.TextColor3 = SelectedTheme.TextColor
 			DropdownSearch.PlaceholderColor3 = SelectedTheme.PlaceholderColor
 			DropdownSearch.BackgroundColor3 = SelectedTheme.InputBackground
-			DropdownSearch.Size = UDim2.new(1, -10, 0, 30)
-			DropdownSearch.Position = UDim2.new(0, 5, 0, 0)
+			DropdownSearch.Size = UDim2.new(1, -36, 0, 30)
+			DropdownSearch.Position = UDim2.new(0, 31, 0, 0)
 			DropdownSearch.LayoutOrder = -1000
 			DropdownSearch.ZIndex = 51
 			DropdownSearch.Parent = Dropdown.List
@@ -3847,11 +3847,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 			local DropdownSearchCorner = Instance.new("UICorner")
 			DropdownSearchCorner.CornerRadius = UDim.new(0, 6)
 			DropdownSearchCorner.Parent = DropdownSearch
-
-			local DropdownSearchPadding = Instance.new("UIPadding")
-			DropdownSearchPadding.PaddingLeft = UDim.new(0, 30)
-			DropdownSearchPadding.PaddingRight = UDim.new(0, 8)
-			DropdownSearchPadding.Parent = DropdownSearch
 
 			local DropdownSearchStroke = Instance.new("UIStroke")
 			DropdownSearchStroke.Color = SelectedTheme.InputStroke
@@ -3862,11 +3857,11 @@ function RayfieldLibrary:CreateWindow(Settings)
 			DropdownSearchIcon.Name = "SearchIcon"
 			DropdownSearchIcon.BackgroundTransparency = 1
 			DropdownSearchIcon.Size = UDim2.fromOffset(16, 16)
-			DropdownSearchIcon.Position = UDim2.new(0, 9, 0.5, -8)
+			DropdownSearchIcon.Position = UDim2.new(0, 10, 0, 7)
 			DropdownSearchIcon.ZIndex = 52
 			DropdownSearchIcon.ImageColor3 = SelectedTheme.PlaceholderColor
 			DropdownSearchIcon.ImageTransparency = 0.2
-			DropdownSearchIcon.Parent = DropdownSearch
+			DropdownSearchIcon.Parent = Dropdown.List
 
 			if Topbar and Topbar:FindFirstChild("Search") then
 				DropdownSearchIcon.Image = Topbar.Search.Image
