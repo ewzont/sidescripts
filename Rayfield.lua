@@ -1395,6 +1395,7 @@ local function Hide(notify: boolean?)
 	task.spawn(closeSearch)
 
 	Debounce = true
+	Main.ClipsDescendants = true
 	if notify then
 		if useMobilePrompt then
 			RayfieldLibrary:Notify({
@@ -1664,6 +1665,7 @@ end
 
 local function Unhide()
 	Debounce = true
+	Main.ClipsDescendants = true
 	Main.Position = UDim2.new(0.5, 0, 0.5, 0)
 	Main.Visible = true
 	TweenService:Create(
@@ -1825,6 +1827,7 @@ local function Unhide()
 
 	task.wait(0.5)
 	Minimised = false
+	Main.ClipsDescendants = false
 	Debounce = false
 end
 
