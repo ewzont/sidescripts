@@ -3857,7 +3857,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 			DropdownSearchIcon.Name = "SearchIcon"
 			DropdownSearchIcon.BackgroundTransparency = 1
 			DropdownSearchIcon.Size = UDim2.fromOffset(16, 16)
-			DropdownSearchIcon.Position = UDim2.new(0, 10, 0, 7)
+			DropdownSearchIcon.Position = UDim2.new(0, 5, 0, 7)
 			DropdownSearchIcon.ZIndex = 52
 			DropdownSearchIcon.ImageColor3 = SelectedTheme.PlaceholderColor
 			DropdownSearchIcon.ImageTransparency = 0.2
