@@ -3827,6 +3827,49 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			Dropdown.Size = UDim2.new(1, -10, 0, 45)
 
+			local DropdownSearch = Instance.new("TextBox")
+			DropdownSearch.Name = "Search"
+			DropdownSearch.ClearTextOnFocus = false
+			DropdownSearch.PlaceholderText = "Search..."
+			DropdownSearch.Text = ""
+			DropdownSearch.Font = Enum.Font.Gotham
+			DropdownSearch.TextSize = 12
+			DropdownSearch.TextXAlignment = Enum.TextXAlignment.Left
+			DropdownSearch.TextColor3 = SelectedTheme.TextColor
+			DropdownSearch.PlaceholderColor3 = SelectedTheme.PlaceholderColor
+			DropdownSearch.BackgroundColor3 = SelectedTheme.InputBackground
+			DropdownSearch.Size = UDim2.new(1, -10, 0, 30)
+			DropdownSearch.Position = UDim2.new(0, 5, 0, 0)
+			DropdownSearch.LayoutOrder = -1000
+			DropdownSearch.ZIndex = 51
+			DropdownSearch.Parent = Dropdown.List
+
+			local DropdownSearchCorner = Instance.new("UICorner")
+			DropdownSearchCorner.CornerRadius = UDim.new(0, 6)
+			DropdownSearchCorner.Parent = DropdownSearch
+
+			local DropdownSearchStroke = Instance.new("UIStroke")
+			DropdownSearchStroke.Color = SelectedTheme.InputStroke
+			DropdownSearchStroke.Thickness = 1
+			DropdownSearchStroke.Parent = DropdownSearch
+
+			local function UpdateDropdownSearchFilter()
+				local query = string.lower(DropdownSearch.Text or "")
+				for _, option in ipairs(Dropdown.List:GetChildren()) do
+					if option.ClassName == "Frame" and option.Name ~= "Placeholder" then
+						if #query == 0 then
+							option.Visible = true
+						else
+							option.Visible = string.find(string.lower(option.Name), query, 1, true) ~= nil
+						end
+					end
+				end
+			end
+
+			DropdownSearch:GetPropertyChangedSignal("Text"):Connect(function()
+				UpdateDropdownSearchFilter()
+			end)
+
 			TweenService
 				:Create(Dropdown, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 })
 				:Play()
@@ -3910,6 +3953,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 						{ Size = UDim2.new(1, -10, 0, 180) }
 					):Play()
 					Dropdown.List.Visible = true
+					DropdownSearch.Text = ""
 					TweenService:Create(
 						Dropdown.List,
 						TweenInfo.new(0.3, Enum.EasingStyle.Exponential),
@@ -4130,6 +4174,8 @@ function RayfieldLibrary:CreateWindow(Settings)
 						DropdownOption.UIStroke.Color = SelectedTheme.ElementStroke
 					end)
 				end
+
+				UpdateDropdownSearchFilter()
 			end
 			SetDropdownOptions()
 
@@ -4229,6 +4275,7 @@ function RayfieldLibrary:CreateWindow(Settings)
 					end
 				end
 				SetDropdownOptions()
+				UpdateDropdownSearchFilter()
 			end
 
 			if Settings.ConfigurationSaving then
@@ -4239,6 +4286,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 			Rayfield.Main:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
 				Dropdown.Toggle.ImageColor3 = SelectedTheme.TextColor
+				DropdownSearch.TextColor3 = SelectedTheme.TextColor
+				DropdownSearch.PlaceholderColor3 = SelectedTheme.PlaceholderColor
+				DropdownSearch.BackgroundColor3 = SelectedTheme.InputBackground
+				DropdownSearchStroke.Color = SelectedTheme.InputStroke
 				TweenService:Create(
 					Dropdown,
 					TweenInfo.new(0.4, Enum.EasingStyle.Exponential),
