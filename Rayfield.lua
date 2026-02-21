@@ -3551,32 +3551,38 @@ function RayfieldLibrary:CreateWindow(Settings)
 					return
 				end
 
-				Label.Title.Text = NewLabel
+				local labelTitle = Label:FindFirstChild("Title")
+				if not labelTitle then
+					return
+				end
+
+				labelTitle.Text = NewLabel
 
 				if Color then
 					Label.BackgroundColor3 = Color or SelectedTheme.SecondaryElementBackground
 					Label.UIStroke.Color = Color or SelectedTheme.SecondaryElementStroke
 				end
 
-				if Icon and Label:FindFirstChild("Icon") then
-					Label.Title.Position = UDim2.new(0, 45, 0.5, 0)
-					Label.Title.Size = UDim2.new(1, -100, 0, 14)
+				local labelIcon = Label:FindFirstChild("Icon")
+				if Icon and labelIcon then
+					labelTitle.Position = UDim2.new(0, 45, 0.5, 0)
+					labelTitle.Size = UDim2.new(1, -100, 0, 14)
 
 					if Icon then
 						if typeof(Icon) == "string" and Icons then
 							local asset = getIcon(Icon)
 
-							Label.Icon.Image = "rbxassetid://" .. asset.id
-							Label.Icon.ImageRectOffset = asset.imageRectOffset
-							Label.Icon.ImageRectSize = asset.imageRectSize
+							labelIcon.Image = "rbxassetid://" .. asset.id
+							labelIcon.ImageRectOffset = asset.imageRectOffset
+							labelIcon.ImageRectSize = asset.imageRectSize
 						else
-							Label.Icon.Image = getAssetUri(Icon)
+							labelIcon.Image = getAssetUri(Icon)
 						end
 					else
-						Label.Icon.Image = "rbxassetid://" .. 0
+						labelIcon.Image = "rbxassetid://" .. 0
 					end
 
-					Label.Icon.Visible = true
+					labelIcon.Visible = true
 				end
 			end
 
