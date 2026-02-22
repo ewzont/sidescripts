@@ -5296,6 +5296,8 @@ Topbar.ChangeSize.MouseButton1Click:Connect(function()
 end)
 
 Main.Search.Input:GetPropertyChangedSignal("Text"):Connect(function()
+	local query = string.lower(Main.Search.Input.Text or "")
+
 	if #Main.Search.Input.Text > 0 then
 		if not Elements.UIPageLayout.CurrentPage:FindFirstChild("SearchTitle-fsefsefesfsefesfesfThanks") then
 			local searchTitle = Elements.Template.SectionTitle:Clone()
@@ -5320,13 +5322,24 @@ Main.Search.Input:GetPropertyChangedSignal("Text"):Connect(function()
 			and element.Name ~= "SearchTitle-fsefsefesfsefesfesfThanks"
 		then
 			if element.Name == "SectionTitle" then
-				if #Main.Search.Input.Text == 0 then
+				if #query == 0 then
 					element.Visible = true
 				else
 					element.Visible = false
 				end
 			else
-				if string.lower(element.Name):find(string.lower(Main.Search.Input.Text), 1, true) then
+				local searchableText = element.Name
+				local titleObject = element:FindFirstChild("Title")
+				if titleObject and (titleObject:IsA("TextLabel") or titleObject:IsA("TextBox")) then
+					searchableText = searchableText .. " " .. titleObject.Text
+				end
+
+				local descriptionObject = element:FindFirstChild("Description")
+				if descriptionObject and (descriptionObject:IsA("TextLabel") or descriptionObject:IsA("TextBox")) then
+					searchableText = searchableText .. " " .. descriptionObject.Text
+				end
+
+				if string.lower(searchableText):find(query, 1, true) then
 					element.Visible = true
 				else
 					element.Visible = false
