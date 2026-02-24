@@ -835,6 +835,32 @@ end
 local keybindConnections = {} -- For storing keybind connections to disconnect when Rayfield is destroyed
 
 local SelectedTheme = RayfieldLibrary.Theme.Default
+local rayfieldFont
+do
+	local ok, font = pcall(function()
+		return Font.fromId(12187365364, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+	end)
+	if ok and font then
+		rayfieldFont = font
+	else
+		rayfieldFont = Font.fromId(12187365364)
+		pcall(function()
+			rayfieldFont = Font.new(rayfieldFont.Family, Enum.FontWeight.SemiBold, rayfieldFont.Style)
+		end)
+	end
+end
+
+local function applyRayfieldFont(instance)
+	if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+		instance.FontFace = rayfieldFont
+	end
+end
+
+for _, descendant in ipairs(Rayfield:GetDescendants()) do
+	applyRayfieldFont(descendant)
+end
+
+Rayfield.DescendantAdded:Connect(applyRayfieldFont)
 
 local function ChangeTheme(Theme)
 	if typeof(Theme) == "string" then
