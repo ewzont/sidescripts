@@ -701,6 +701,7 @@ local UserInputService = getService("UserInputService")
 local TweenService = getService("TweenService")
 local Players = getService("Players")
 local CoreGui = getService("CoreGui")
+local GuiService = getService("GuiService")
 
 -- Interface Management
 
@@ -812,6 +813,25 @@ local Hidden = false
 local Debounce = false
 local searchOpen = false
 local Notifications = Rayfield.Notifications
+local guiInsetY = 0
+pcall(function()
+	local inset = GuiService:GetGuiInset()
+	if inset then
+		guiInsetY = inset.Y
+	end
+end)
+local announcementOffset = (useMobileSizing and 80 or 60) + guiInsetY
+local Announcements = Notifications:Clone()
+Announcements.Name = "Announcements"
+Announcements.Parent = Notifications.Parent
+Announcements.AnchorPoint = Vector2.new(0.5, 0)
+Announcements.Position = UDim2.new(0.5, 0, 0, announcementOffset)
+Announcements.Visible = false
+local announcementsLayout = Announcements:FindFirstChild("UIListLayout")
+if announcementsLayout then
+	announcementsLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+	announcementsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+end
 local keybindConnections = {} -- For storing keybind connections to disconnect when Rayfield is destroyed
 
 local SelectedTheme = RayfieldLibrary.Theme.Default
@@ -847,7 +867,7 @@ local function ChangeTheme(Theme)
 	end
 
 	for _, text in ipairs(Rayfield:GetDescendants()) do
-		if text.Parent.Parent ~= Notifications then
+		if text.Parent.Parent ~= Notifications and (not Announcements or text.Parent.Parent ~= Announcements) then
 			if text:IsA("TextLabel") or text:IsA("TextBox") then
 				text.TextColor3 = SelectedTheme.TextColor
 			end
@@ -1134,13 +1154,13 @@ local function SaveConfiguration()
 	)
 end
 
-function RayfieldLibrary:Notify(data) -- action e.g open messages
+local function spawnNotification(container, data)
 	task.spawn(function()
 		-- Notification Object Creation
-		local newNotification = Notifications.Template:Clone()
+		local newNotification = container.Template:Clone()
 		newNotification.Name = data.Title or "No Title Provided"
-		newNotification.Parent = Notifications
-		newNotification.LayoutOrder = #Notifications:GetChildren()
+		newNotification.Parent = container
+		newNotification.LayoutOrder = #container:GetChildren()
 		newNotification.Visible = false
 
 		-- Set Data
@@ -1191,7 +1211,9 @@ function RayfieldLibrary:Notify(data) -- action e.g open messages
 
 		-- Calculate textbounds and set initial values
 		local bounds = { newNotification.Title.TextBounds.Y, newNotification.Description.TextBounds.Y }
-		newNotification.Size = UDim2.new(1, -60, 0, -Notifications:FindFirstChild("UIListLayout").Padding.Offset)
+		local layout = container:FindFirstChild("UIListLayout")
+		local layoutPadding = layout and layout.Padding.Offset or 0
+		newNotification.Size = UDim2.new(1, -60, 0, -layoutPadding)
 
 		newNotification.Icon.Size = UDim2.new(0, 32, 0, 32)
 		newNotification.Icon.Position = UDim2.new(0, 20, 0.5, 0)
@@ -1270,12 +1292,24 @@ function RayfieldLibrary:Notify(data) -- action e.g open messages
 		TweenService:Create(
 			newNotification,
 			TweenInfo.new(1, Enum.EasingStyle.Exponential),
-			{ Size = UDim2.new(1, -90, 0, -Notifications:FindFirstChild("UIListLayout").Padding.Offset) }
+			{ Size = UDim2.new(1, -90, 0, -layoutPadding) }
 		):Play()
 
 		newNotification.Visible = false
 		newNotification:Destroy()
 	end)
+end
+
+function RayfieldLibrary:Notify(data) -- action e.g open messages
+	spawnNotification(Notifications, data)
+end
+
+function RayfieldLibrary:Announce(data)
+	if not Announcements then
+		spawnNotification(Notifications, data)
+		return
+	end
+	spawnNotification(Announcements, data)
 end
 
 local function openSearch()
@@ -2668,6 +2702,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	Notifications.Template.Visible = false
 	Notifications.Visible = true
+	if Announcements then
+		Announcements.Template.Visible = false
+		Announcements.Visible = true
+	end
 	Rayfield.Enabled = true
 
 	task.wait(0.5)
