@@ -1,3 +1,4 @@
+local GuiService = game:GetService("GuiService")
 --[[
 
 	Rayfield Interface Suite
@@ -957,6 +958,7 @@ local Hidden = false
 local Debounce = false
 local searchOpen = false
 local Notifications = Rayfield.Notifications
+
 local guiInsetY = 0
 pcall(function()
 	local inset = GuiService:GetGuiInset()
@@ -964,18 +966,13 @@ pcall(function()
 		guiInsetY = inset.Y
 	end
 end)
-local notificationOffset = (useMobileSizing and 112 or 96) + guiInsetY
-Notifications.Position = UDim2.new(
-	Notifications.Position.X.Scale,
-	Notifications.Position.X.Offset,
-	Notifications.Position.Y.Scale,
-	notificationOffset
-)
+
+local announcementOffset = (useMobileSizing and 80 or 60) + guiInsetY
 local Announcements = Notifications:Clone()
 Announcements.Name = "Announcements"
 Announcements.Parent = Notifications.Parent
 Announcements.AnchorPoint = Vector2.new(0.5, 0)
-Announcements.Position = UDim2.new(0.5, 0, 0, notificationOffset)
+Announcements.Position = UDim2.new(0.5, 0, 0, announcementOffset)
 Announcements.Visible = false
 local announcementsLayout = Announcements:FindFirstChild("UIListLayout")
 if announcementsLayout then
@@ -2569,10 +2566,6 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	Notifications.Template.Visible = false
 	Notifications.Visible = true
-	if Announcements then
-		Announcements.Template.Visible = false
-		Announcements.Visible = true
-	end
 	Rayfield.Enabled = true
 
 	task.wait(0.5)
