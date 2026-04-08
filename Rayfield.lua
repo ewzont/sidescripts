@@ -964,7 +964,7 @@ pcall(function()
 		guiInsetY = inset.Y
 	end
 end)
-local notificationOffset = (useMobileSizing and 80 or 60) + guiInsetY
+local notificationOffset = (useMobileSizing and 112 or 96) + guiInsetY
 Notifications.Position = UDim2.new(
 	Notifications.Position.X.Scale,
 	Notifications.Position.X.Offset,
