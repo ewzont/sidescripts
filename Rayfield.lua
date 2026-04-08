@@ -964,10 +964,7 @@ pcall(function()
 		guiInsetY = inset.Y
 	end
 end)
-local commandBarTopPadding = 8
-local commandBarHeight = 40
-local notificationPadding = useMobileSizing and 20 or 16
-local notificationOffset = guiInsetY + commandBarTopPadding + commandBarHeight + notificationPadding
+local notificationOffset = (useMobileSizing and 80 or 60) + guiInsetY
 Notifications.Position = UDim2.new(
 	Notifications.Position.X.Scale,
 	Notifications.Position.X.Offset,
