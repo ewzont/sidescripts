@@ -1,4 +1,3 @@
-local GuiService = game:GetService("GuiService")
 --[[
 
 	Rayfield Interface Suite
@@ -25,6 +24,7 @@ local UserInputService = getService("UserInputService")
 local TweenService = getService("TweenService")
 local Players = getService("Players")
 local CoreGui = getService("CoreGui")
+local GuiService = getService("GuiService")
 
 -- Loads and executes a function hosted on a remote URL. Cancels the request if the requested URL takes too long to respond.
 -- Errors with the function are caught and logged to the output
@@ -958,7 +958,6 @@ local Hidden = false
 local Debounce = false
 local searchOpen = false
 local Notifications = Rayfield.Notifications
-
 local guiInsetY = 0
 pcall(function()
 	local inset = GuiService:GetGuiInset()
@@ -966,7 +965,6 @@ pcall(function()
 		guiInsetY = inset.Y
 	end
 end)
-
 local announcementOffset = (useMobileSizing and 80 or 60) + guiInsetY
 local Announcements = Notifications:Clone()
 Announcements.Name = "Announcements"
@@ -2566,6 +2564,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	Notifications.Template.Visible = false
 	Notifications.Visible = true
+	if Announcements then
+		Announcements.Template.Visible = false
+		Announcements.Visible = true
+	end
 	Rayfield.Enabled = true
 
 	task.wait(0.5)
