@@ -964,12 +964,21 @@ pcall(function()
 		guiInsetY = inset.Y
 	end
 end)
-local announcementOffset = (useMobileSizing and 80 or 60) + guiInsetY
+local commandBarTopPadding = 8
+local commandBarHeight = 40
+local notificationPadding = useMobileSizing and 20 or 16
+local notificationOffset = guiInsetY + commandBarTopPadding + commandBarHeight + notificationPadding
+Notifications.Position = UDim2.new(
+	Notifications.Position.X.Scale,
+	Notifications.Position.X.Offset,
+	Notifications.Position.Y.Scale,
+	notificationOffset
+)
 local Announcements = Notifications:Clone()
 Announcements.Name = "Announcements"
 Announcements.Parent = Notifications.Parent
 Announcements.AnchorPoint = Vector2.new(0.5, 0)
-Announcements.Position = UDim2.new(0.5, 0, 0, announcementOffset)
+Announcements.Position = UDim2.new(0.5, 0, 0, notificationOffset)
 Announcements.Visible = false
 local announcementsLayout = Announcements:FindFirstChild("UIListLayout")
 if announcementsLayout then
