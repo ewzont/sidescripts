@@ -721,17 +721,18 @@ repeat
 
 	correctBuild = false
 
-	if not warned then
-		warn("Rayfield | Build Mismatch")
-		print(
-			"Rayfield may encounter issues as you are running an incompatible interface version ("
-				.. ((Rayfield:FindFirstChild("Build") and Rayfield.Build.Value) or "No Build")
-				.. ").\n\nThis version of Rayfield is intended for interface build "
-				.. InterfaceBuild
-				.. "."
-		)
-		warned = true
-	end
+	-- if not warned then
+	-- 	warn("Rayfield | Build Mismatch")
+	-- 	print(
+	-- 		"Rayfield may encounter issues as you are running an incompatible interface version ("
+	-- 			.. ((Rayfield:FindFirstChild("Build") and Rayfield.Build.Value) or "No Build")
+	-- 			.. ").\n\nThis version of Rayfield is intended for interface build "
+	-- 			.. InterfaceBuild
+	-- 			.. "."
+	-- 	)
+	-- 	warned = true
+	-- end
+	warned = true
 
 	toDestroy, Rayfield =
 		Rayfield,
