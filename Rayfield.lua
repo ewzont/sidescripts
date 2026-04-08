@@ -957,7 +957,14 @@ local Hidden = false
 local Debounce = false
 local searchOpen = false
 local Notifications = Rayfield.Notifications
-local announcementOffset = useMobileSizing and 80 or 60
+local guiInsetY = 0
+pcall(function()
+	local inset = GuiService:GetGuiInset()
+	if inset then
+		guiInsetY = inset.Y
+	end
+end)
+local announcementOffset = (useMobileSizing and 80 or 60) + guiInsetY
 local Announcements = Notifications:Clone()
 Announcements.Name = "Announcements"
 Announcements.Parent = Notifications.Parent
@@ -2556,6 +2563,10 @@ function RayfieldLibrary:CreateWindow(Settings)
 
 	Notifications.Template.Visible = false
 	Notifications.Visible = true
+	if Announcements then
+		Announcements.Template.Visible = false
+		Announcements.Visible = true
+	end
 	Rayfield.Enabled = true
 
 	task.wait(0.5)
