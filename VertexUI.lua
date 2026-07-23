@@ -52,10 +52,12 @@ Vertex.Theme = {
 	Knob = Color3.fromRGB(245, 245, 245),
 }
 
--- Hairline strokes: white at low opacity.
+-- Hairline strokes: white at low opacity. Kept slightly thick + visible so
+-- Roblox doesn't render 1px strokes unevenly.
 local STROKE_COLOR = Color3.fromRGB(255, 255, 255)
-local STROKE_SOFT = 0.9
-local STROKE_STRONG = 0.82
+local STROKE_SOFT = 0.84
+local STROKE_STRONG = 0.72
+local STROKE_THICKNESS = 1.6
 
 -- One radius scale for the whole library.
 local RADIUS = {
@@ -112,13 +114,27 @@ local function addCorner(instance, radius)
 	}, instance)
 end
 
-local function addStroke(instance, transparency, color)
+local function addStroke(instance, transparency, color, thickness)
 	return create("UIStroke", {
 		Color = color or STROKE_COLOR,
 		Transparency = transparency or STROKE_SOFT,
-		Thickness = 1,
+		Thickness = thickness or STROKE_THICKNESS,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, instance)
+end
+
+-- Squares off an interior edge of a rounded panel so its corner radius only
+-- shows where we want it (used to round only the window-facing corners).
+local function cornerFill(parent, anchor, position, size, zIndex)
+	return create("Frame", {
+		Name = "CornerFill",
+		BackgroundColor3 = Vertex.Theme.Surface,
+		BorderSizePixel = 0,
+		AnchorPoint = anchor,
+		Position = position,
+		Size = size,
+		ZIndex = zIndex or 3,
+	}, parent)
 end
 
 local function addPadding(instance, top, right, bottom, left)
@@ -510,28 +526,13 @@ function Vertex:CreateWindow(options)
 		Size = options.Size or UDim2.fromOffset(640, 460),
 		BackgroundColor3 = Vertex.Theme.Background,
 		BorderSizePixel = 0,
-		ClipsDescendants = true,
+		ClipsDescendants = false,
 		ZIndex = 2,
 	}, screenGui)
 	addCorner(main, RADIUS.Window)
 	addStroke(main, STROKE_STRONG)
 
 	local uiScale = create("UIScale", { Scale = 1 }, main)
-
-	-- Soft drop shadow.
-	create("ImageLabel", {
-		Name = "Shadow",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(1, 60, 1, 60),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://6014261993",
-		ImageColor3 = Color3.new(0, 0, 0),
-		ImageTransparency = 0.4,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(49, 49, 450, 450),
-		ZIndex = 1,
-	}, screenGui)
 
 	----------------------------------------------------------------
 	-- Top bar (title + minimise, full-width drag handle)
@@ -544,6 +545,9 @@ function Vertex:CreateWindow(options)
 		Active = true,
 		ZIndex = 4,
 	}, main)
+	-- Round the top corners to match the window; square off the bottom edge.
+	addCorner(topBar, RADIUS.Window)
+	cornerFill(topBar, Vector2.new(0, 1), UDim2.new(0, 0, 1, 0), UDim2.new(1, 0, 0, RADIUS.Window), 4)
 
 	create("Frame", {
 		Name = "TopDivider",
@@ -609,24 +613,21 @@ function Vertex:CreateWindow(options)
 	minimiseIcon.Position = UDim2.fromScale(0.5, 0.5)
 
 	----------------------------------------------------------------
-	-- Body: sidebar + content
+	-- Sidebar + content (parented straight to main so their window-facing
+	-- corners aren't squared by a clipping parent)
 	----------------------------------------------------------------
-	local body = create("Frame", {
-		Name = "Body",
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, SPACING.TopBar),
-		Size = UDim2.new(1, 0, 1, -SPACING.TopBar),
-		ClipsDescendants = true,
-		ZIndex = 3,
-	}, main)
-
 	local sidebar = create("Frame", {
 		Name = "Sidebar",
 		BackgroundColor3 = Vertex.Theme.Surface,
 		BorderSizePixel = 0,
-		Size = UDim2.new(0, SPACING.SideW, 1, 0),
+		Position = UDim2.fromOffset(0, SPACING.TopBar),
+		Size = UDim2.new(0, SPACING.SideW, 1, -SPACING.TopBar),
 		ZIndex = 3,
-	}, body)
+	}, main)
+	-- Round only the bottom-left (window) corner; square the interior edges.
+	addCorner(sidebar, RADIUS.Window)
+	cornerFill(sidebar, Vector2.new(0, 0), UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, RADIUS.Window), 3)
+	cornerFill(sidebar, Vector2.new(1, 0), UDim2.new(1, 0, 0, 0), UDim2.new(0, RADIUS.Window, 1, 0), 3)
 
 	create("Frame", {
 		Name = "Divider",
@@ -635,7 +636,7 @@ function Vertex:CreateWindow(options)
 		BorderSizePixel = 0,
 		Position = UDim2.new(1, -1, 0, 0),
 		Size = UDim2.new(0, 1, 1, 0),
-		ZIndex = 3,
+		ZIndex = 4,
 	}, sidebar)
 
 	local tabList = create("ScrollingFrame", {
@@ -648,7 +649,7 @@ function Vertex:CreateWindow(options)
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 0,
 		ScrollingDirection = Enum.ScrollingDirection.Y,
-		ZIndex = 3,
+		ZIndex = 4,
 	}, sidebar)
 	create("UIListLayout", {
 		Padding = UDim.new(0, 5),
@@ -658,16 +659,16 @@ function Vertex:CreateWindow(options)
 	local content = create("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(SPACING.SideW, 0),
-		Size = UDim2.new(1, -SPACING.SideW, 1, 0),
+		Position = UDim2.fromOffset(SPACING.SideW, SPACING.TopBar),
+		Size = UDim2.new(1, -SPACING.SideW, 1, -SPACING.TopBar),
+		ClipsDescendants = true,
 		ZIndex = 3,
-	}, body)
+	}, main)
 
 	local window = {
 		ScreenGui = screenGui,
 		Instance = main,
 		TopBar = topBar,
-		Body = body,
 		Sidebar = sidebar,
 		TabList = tabList,
 		Content = content,
@@ -694,11 +695,21 @@ function Vertex:CreateWindow(options)
 	function window:SetMinimised(state)
 		self.Minimised = state == true
 		if self.Minimised then
+			-- Hide the body immediately (main no longer clips) then collapse.
+			sidebar.Visible = false
+			content.Visible = false
 			motion(main, "Size", UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, SPACING.TopBar), 16)
 			motion(minimiseIcon, "Rotation", 45, 18)
 		else
 			motion(main, "Size", UDim2.new(main.Size.X.Scale, main.Size.X.Offset, 0, self.ExpandedHeight), 16)
 			motion(minimiseIcon, "Rotation", 0, 18)
+			-- Reveal the body once the window has grown back to full height.
+			task.delay(0.28, function()
+				if not self.Minimised then
+					sidebar.Visible = true
+					content.Visible = true
+				end
+			end)
 		end
 	end
 
@@ -802,7 +813,9 @@ function Vertex:CreateWindow(options)
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			ZIndex = 3,
 		}, content)
-		addPadding(page, 0, 4, 8, 0)
+		-- Inset content from the ScrollingFrame clip so section corners/strokes
+		-- render fully (no chopped-off left edge, no squared top corners).
+		addPadding(page, 4, 10, 10, 8)
 		create("UIListLayout", {
 			Padding = UDim.new(0, SPACING.Gap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
@@ -1010,7 +1023,7 @@ function Vertex:CreateWindow(options)
 				local value = math.clamp(tonumber(sliderOptions.Default) or minimum, minimum, maximum)
 				Vertex.Flags[flag] = value
 
-				local row = makeControl(self, 62)
+				local row = makeControl(self, 68)
 				stackLabel(row, sliderOptions.Name or "Slider")
 				local valueLabel = create(
 					"TextLabel",
@@ -1018,15 +1031,15 @@ function Vertex:CreateWindow(options)
 						Text = tostring(value) .. (sliderOptions.Suffix or ""),
 						TextXAlignment = Enum.TextXAlignment.Right,
 						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.new(1, -14, 0, 10),
+						Position = UDim2.new(1, -14, 0, 12),
 						Size = UDim2.fromOffset(100, 18),
 						ZIndex = 3,
 					}),
 					row
 				)
 				local track = create("TextButton", {
-					Position = UDim2.new(0, 14, 0, 40),
-					Size = UDim2.new(1, -28, 0, 6),
+					Position = UDim2.new(0, 14, 0, 46),
+					Size = UDim2.new(1, -28, 0, 7),
 					BackgroundColor3 = Vertex.Theme.SurfaceHover,
 					BorderSizePixel = 0,
 					Text = "",
@@ -1101,13 +1114,13 @@ function Vertex:CreateWindow(options)
 				local value = tostring(inputOptions.Default or "")
 				Vertex.Flags[flag] = value
 
-				local row = makeControl(self, 66)
+				local row = makeControl(self, 78)
 				stackLabel(row, inputOptions.Name or "Input")
 				local field = create(
 					"TextBox",
 					merge(textProps(TEXT.Body, Vertex.Theme.Text, Vertex.Fonts.Medium), {
-						Position = UDim2.new(0, 14, 0, 34),
-						Size = UDim2.new(1, -28, 0, 26),
+						Position = UDim2.new(0, 14, 0, 38),
+						Size = UDim2.new(1, -28, 0, 30),
 						BackgroundColor3 = Vertex.Theme.Background,
 						BorderSizePixel = 0,
 						Text = value,
@@ -1121,7 +1134,7 @@ function Vertex:CreateWindow(options)
 				)
 				addCorner(field, RADIUS.Inner)
 				local fieldStroke = addStroke(field, STROKE_SOFT)
-				addPadding(field, 0, 10, 0, 10)
+				addPadding(field, 0, 12, 0, 12)
 
 				local control = { Instance = row, Input = field, Flag = flag, Value = value }
 				function control:Set(newValue, silent)
@@ -1158,16 +1171,16 @@ function Vertex:CreateWindow(options)
 				local selected = dropdownOptions.Default
 				Vertex.Flags[flag] = selected
 
-				local baseHeight = 64
-				local optionHeight = 30
+				local baseHeight = 78
+				local optionHeight = 32
 				local row = makeControl(self, baseHeight)
 				stackLabel(row, dropdownOptions.Name or "Dropdown")
 
 				local selector = create(
 					"TextButton",
 					merge(textProps(TEXT.Body, Vertex.Theme.Text, Vertex.Fonts.Medium), {
-						Position = UDim2.new(0, 14, 0, 34),
-						Size = UDim2.new(1, -28, 0, 26),
+						Position = UDim2.new(0, 14, 0, 38),
+						Size = UDim2.new(1, -28, 0, 30),
 						BackgroundColor3 = Vertex.Theme.Background,
 						BorderSizePixel = 0,
 						Text = selected and tostring(selected) or (dropdownOptions.Placeholder or "Select..."),
@@ -1180,7 +1193,7 @@ function Vertex:CreateWindow(options)
 				)
 				addCorner(selector, RADIUS.Inner)
 				addStroke(selector, STROKE_SOFT)
-				addPadding(selector, 0, 32, 0, 10)
+				addPadding(selector, 0, 34, 0, 12)
 
 				local chevron = makeGlyph(selector, "chevron-down", "⌄", 16, Vertex.Theme.TextMuted)
 				chevron.AnchorPoint = Vector2.new(1, 0.5)
