@@ -216,6 +216,40 @@ local function setNow(instance, property, value)
 	end
 end
 
+-- Snapshot every fade-able transparency under `root` (plus root itself) so a
+-- whole subtree can be faded out and later restored to its exact look.
+local function snapshotAlpha(root)
+	local list = { { root, "BackgroundTransparency", root.BackgroundTransparency } }
+	for _, inst in ipairs(root:GetDescendants()) do
+		if inst:IsA("GuiObject") then
+			list[#list + 1] = { inst, "BackgroundTransparency", inst.BackgroundTransparency }
+		end
+		if inst:IsA("TextLabel") or inst:IsA("TextButton") or inst:IsA("TextBox") then
+			list[#list + 1] = { inst, "TextTransparency", inst.TextTransparency }
+		end
+		if inst:IsA("ImageLabel") or inst:IsA("ImageButton") then
+			list[#list + 1] = { inst, "ImageTransparency", inst.ImageTransparency }
+		end
+		if inst:IsA("UIStroke") then
+			list[#list + 1] = { inst, "Transparency", inst.Transparency }
+		end
+	end
+	return list
+end
+
+-- Drive a snapshot toward shown (its captured values) or hidden (fully clear).
+local function fadeAlpha(list, shown, speed)
+	for _, entry in ipairs(list) do
+		motion(entry[1], entry[2], shown and entry[3] or 1, speed)
+	end
+end
+
+local function setAlpha(list, shown)
+	for _, entry in ipairs(list) do
+		setNow(entry[1], entry[2], shown and entry[3] or 1)
+	end
+end
+
 connect(RunService.Heartbeat, function(dt)
 	for instance, props in pairs(Motion) do
 		if typeof(instance) ~= "Instance" or not instance.Parent then
@@ -531,7 +565,6 @@ function Vertex:CreateWindow(options)
 		ZIndex = 2,
 	}, screenGui)
 	addCorner(main, RADIUS.Window)
-	addStroke(main, STROKE_STRONG)
 
 	local uiScale = create("UIScale", { Scale = 1 }, main)
 
@@ -685,8 +718,47 @@ function Vertex:CreateWindow(options)
 	makeDraggable(topBar, main)
 
 	function window:SetVisible(value)
-		self.Visible = value == true
-		screenGui.Enabled = self.Visible
+		value = value == true
+		if value == self.Visible then
+			return
+		end
+		self.Visible = value
+
+		if value then
+			-- Open: drop in from slightly above, scale up and fade every element
+			-- back to its captured look.
+			screenGui.Enabled = true
+			local alpha = self._alpha or snapshotAlpha(main)
+			self._alpha = alpha
+			local rest = main.Position
+
+			setNow(uiScale, "Scale", 0.9)
+			setNow(main, "Position", rest - UDim2.fromOffset(0, 22))
+			setAlpha(alpha, false)
+
+			motion(uiScale, "Scale", 1, 13)
+			motion(main, "Position", rest, 15)
+			fadeAlpha(alpha, true, 14)
+		else
+			-- Close: snapshot the current look (so re-opening restores it),
+			-- then slide down, shrink and fade out before disabling.
+			local alpha = snapshotAlpha(main)
+			self._alpha = alpha
+			local rest = main.Position
+
+			motion(uiScale, "Scale", 0.9, 19)
+			motion(main, "Position", rest + UDim2.fromOffset(0, 22), 19)
+			fadeAlpha(alpha, false, 20)
+
+			task.delay(0.3, function()
+				if not self.Visible then
+					screenGui.Enabled = false
+					setNow(uiScale, "Scale", 1)
+					setNow(main, "Position", rest)
+					setAlpha(alpha, true)
+				end
+			end)
+		end
 	end
 
 	function window:Toggle()
@@ -746,11 +818,9 @@ function Vertex:CreateWindow(options)
 		end
 	end)
 
-	-- Entrance animation (smoothed).
-	uiScale.Scale = 0.93
-	main.BackgroundTransparency = 1
-	motion(uiScale, "Scale", 1, 11)
-	motion(main, "BackgroundTransparency", 0, 12)
+	-- Entrance animation: reuse the open transition (drop-in + scale + fade).
+	window.Visible = false
+	window:SetVisible(true)
 
 	function window:AddTab(tabOptions)
 		tabOptions = tabOptions or {}
@@ -839,7 +909,15 @@ function Vertex:CreateWindow(options)
 			end
 			for _, other in ipairs(window.Tabs) do
 				local selected = other == self
-				other.Page.Visible = selected
+				if selected then
+					-- Slide the page up a touch and fade it in.
+					other.Page.Visible = true
+					other.Page.Position = UDim2.fromOffset(SPACING.Window, SPACING.Window + 14)
+					setNow(other.Page, "CanvasPosition", Vector2.new())
+					motion(other.Page, "Position", UDim2.fromOffset(SPACING.Window, SPACING.Window), 16)
+				else
+					other.Page.Visible = false
+				end
 				motion(other.Button, "BackgroundTransparency", selected and 0 or 1, 18)
 				motion(other.Label, "TextColor3", selected and Vertex.Theme.Text or Vertex.Theme.TextMuted, 18)
 				motion(other.Indicator, "BackgroundTransparency", selected and 0 or 1, 18)
@@ -876,7 +954,6 @@ function Vertex:CreateWindow(options)
 				ZIndex = 3,
 			}, page)
 			addCorner(sectionFrame, RADIUS.Card)
-			addStroke(sectionFrame, STROKE_SOFT)
 			addPadding(sectionFrame, SPACING.Section, SPACING.Section, SPACING.Section, SPACING.Section)
 			create("UIListLayout", {
 				Padding = UDim.new(0, 12),
@@ -1133,7 +1210,6 @@ function Vertex:CreateWindow(options)
 					row
 				)
 				addCorner(field, RADIUS.Inner)
-				local fieldStroke = addStroke(field, STROKE_SOFT)
 				addPadding(field, 0, 12, 0, 12)
 
 				local control = { Instance = row, Input = field, Flag = flag, Value = value }
@@ -1146,12 +1222,10 @@ function Vertex:CreateWindow(options)
 					end
 				end
 				connect(field.Focused, function()
-					motion(fieldStroke, "Transparency", 0.3, 22)
-					motion(fieldStroke, "Color", Vertex.Theme.Accent, 22)
+					motion(field, "BackgroundColor3", Vertex.Theme.SurfaceHover, 22)
 				end)
 				connect(field.FocusLost, function(enterPressed)
-					motion(fieldStroke, "Transparency", STROKE_SOFT, 22)
-					motion(fieldStroke, "Color", STROKE_COLOR, 22)
+					motion(field, "BackgroundColor3", Vertex.Theme.Background, 22)
 					if inputOptions.Numeric and not tonumber(field.Text) then
 						field.Text = self.Value
 						return
@@ -1192,7 +1266,6 @@ function Vertex:CreateWindow(options)
 					row
 				)
 				addCorner(selector, RADIUS.Inner)
-				addStroke(selector, STROKE_SOFT)
 				addPadding(selector, 0, 34, 0, 12)
 
 				local chevron = makeGlyph(selector, "chevron-down", "⌄", 16, Vertex.Theme.TextMuted)
@@ -1326,7 +1399,6 @@ function Vertex:CreateWindow(options)
 					row
 				)
 				addCorner(bindButton, RADIUS.Inner)
-				addStroke(bindButton, STROKE_SOFT)
 
 				local listening = false
 				local control = { Instance = row, Flag = flag, Value = value }
@@ -1414,11 +1486,10 @@ function Vertex:Notify(options)
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(310, options.Description and 74 or 54),
-		Position = UDim2.fromOffset(24, 0),
+		Position = UDim2.fromOffset(56, 0),
 		ZIndex = 61,
 	}, holder)
 	addCorner(notification, RADIUS.Card)
-	local notifStroke = addStroke(notification, 1)
 
 	local accentBar = create("Frame", {
 		BackgroundColor3 = options.Color or self.Theme.Accent,
@@ -1459,27 +1530,27 @@ function Vertex:Notify(options)
 		)
 	end
 
-	motion(notification, "BackgroundTransparency", 0, 14)
-	motion(notification, "Position", UDim2.fromOffset(0, 0), 16)
-	motion(notifStroke, "Transparency", STROKE_SOFT, 14)
-	motion(accentBar, "BackgroundTransparency", 0, 14)
-	motion(title, "TextTransparency", 0, 14)
+	-- Slide in from the right while fading up.
+	motion(notification, "BackgroundTransparency", 0, 15)
+	motion(notification, "Position", UDim2.fromOffset(0, 0), 17)
+	motion(accentBar, "BackgroundTransparency", 0, 15)
+	motion(title, "TextTransparency", 0, 15)
 	if body then
-		motion(body, "TextTransparency", 0, 14)
+		motion(body, "TextTransparency", 0, 15)
 	end
 
 	task.delay(options.Duration or 3, function()
 		if not notification.Parent then
 			return
 		end
-		motion(notifStroke, "Transparency", 1, 22)
-		motion(accentBar, "BackgroundTransparency", 1, 22)
-		motion(title, "TextTransparency", 1, 22)
+		-- Slide back out to the right while fading away.
+		motion(accentBar, "BackgroundTransparency", 1, 24)
+		motion(title, "TextTransparency", 1, 24)
 		if body then
-			motion(body, "TextTransparency", 1, 22)
+			motion(body, "TextTransparency", 1, 24)
 		end
-		motion(notification, "BackgroundTransparency", 1, 22)
-		motion(notification, "Position", UDim2.fromOffset(24, 0), 22)
+		motion(notification, "BackgroundTransparency", 1, 24)
+		motion(notification, "Position", UDim2.fromOffset(56, 0), 22)
 		task.wait(0.35)
 		if notification.Parent then
 			notification:Destroy()
