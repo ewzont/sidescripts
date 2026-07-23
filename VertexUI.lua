@@ -1204,7 +1204,9 @@ function Vertex:CreateWindow(options)
 						PlaceholderText = inputOptions.Placeholder or "Enter a value...",
 						PlaceholderColor3 = Vertex.Theme.TextDim,
 						ClearTextOnFocus = false,
-						ClipsDescendants = true,
+						-- No ClipsDescendants: it would clip the field's own UIStroke
+						-- border. The control row clips any extreme overflow.
+						ClipsDescendants = false,
 						ZIndex = 3,
 					}),
 					row
@@ -1263,7 +1265,8 @@ function Vertex:CreateWindow(options)
 						Text = selected and tostring(selected) or (dropdownOptions.Placeholder or "Select..."),
 						TextColor3 = selected and Vertex.Theme.Text or Vertex.Theme.TextDim,
 						AutoButtonColor = false,
-						ClipsDescendants = true,
+						-- No ClipsDescendants so the UIStroke border renders.
+						ClipsDescendants = false,
 						ZIndex = 3,
 					}),
 					row
