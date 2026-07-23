@@ -2,6 +2,9 @@
 	Vertex UI
 	A compact, one-file Roblox UI library.
 
+	Visual language matches avahub.online:
+	near-black surfaces, hairline white strokes, an orange accent, and Inter.
+
 	Quick start:
 		local Vertex = loadstring(game:HttpGet("YOUR_RAW_URL"))()
 		local Window = Vertex:CreateWindow({ Title = "Vertex", Subtitle = "Dashboard" })
@@ -22,30 +25,71 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
 local Vertex = {
-	Version = "0.1.0",
+	Version = "0.2.0",
 	Flags = {},
 	Windows = {},
 	Connections = {},
 }
 
+--=====================================================================
+-- Design tokens (mirrored from avahub.online)
+--=====================================================================
+
+-- Colors
 Vertex.Theme = {
-	Background = Color3.fromRGB(2, 6, 23),
-	Surface = Color3.fromRGB(15, 23, 42),
-	SurfaceRaised = Color3.fromRGB(24, 34, 54),
-	SurfaceHover = Color3.fromRGB(31, 43, 66),
-	Border = Color3.fromRGB(51, 65, 85),
-	BorderSoft = Color3.fromRGB(38, 50, 70),
-	Text = Color3.fromRGB(248, 250, 252),
-	TextMuted = Color3.fromRGB(148, 163, 184),
-	TextDim = Color3.fromRGB(100, 116, 139),
-	Accent = Color3.fromRGB(34, 197, 94),
-	AccentHover = Color3.fromRGB(48, 211, 111),
-	AccentDark = Color3.fromRGB(20, 83, 45),
-	Danger = Color3.fromRGB(239, 68, 68),
+	Background = Color3.fromRGB(5, 5, 5), -- --bg      #050505
+	Surface = Color3.fromRGB(23, 23, 23), -- --surface #171717
+	SurfaceRaised = Color3.fromRGB(31, 31, 31), -- --surface-2 #1f1f1f
+	SurfaceHover = Color3.fromRGB(40, 40, 40), -- hover step
+	Text = Color3.fromRGB(242, 242, 242), -- --text    #f2f2f2
+	TextMuted = Color3.fromRGB(163, 163, 163), -- --muted   #a3a3a3
+	TextDim = Color3.fromRGB(82, 82, 82), -- --dim     #525252
+	Accent = Color3.fromRGB(255, 82, 37), -- --accent  #ff5225
+	AccentHover = Color3.fromRGB(255, 108, 68),
+	AccentText = Color3.fromRGB(255, 181, 159), -- soft accent #ffb59f
+	AccentTint = Color3.fromRGB(38, 17, 11), -- accent-soft blended on bg
+	Success = Color3.fromRGB(34, 197, 94), -- online #22c55e
+	Danger = Color3.fromRGB(239, 68, 68), -- #ef4444
+	Knob = Color3.fromRGB(245, 245, 245),
+}
+
+-- Hairline strokes are white at low opacity, exactly like the site.
+local STROKE_COLOR = Color3.fromRGB(255, 255, 255)
+local STROKE_SOFT = 0.92 -- rgba(255,255,255,0.08)
+local STROKE_STRONG = 0.86
+
+-- One radius scale for the whole library (no more mismatched corners).
+local RADIUS = {
+	Window = 16,
+	Card = 12,
+	Control = 10,
+	Inner = 8,
+	Pill = 999,
+}
+
+-- One type scale, all Inter.
+local TEXT = {
+	Title = 16,
+	Value = 13,
+	Label = 13,
+	Body = 12,
+	Small = 11,
+	Micro = 10,
+}
+
+local SPACING = {
+	Window = 16,
+	Section = 14,
+	Gap = 10,
+	ControlH = 42,
 }
 
 local animation = TweenInfo.new(0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 local fastAnimation = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+--=====================================================================
+-- Low-level helpers
+--=====================================================================
 
 local function connect(signal, callback)
 	local connection = signal:Connect(callback)
@@ -72,15 +116,15 @@ end
 
 local function addCorner(instance, radius)
 	return create("UICorner", {
-		CornerRadius = UDim.new(0, radius or 8),
+		CornerRadius = UDim.new(0, radius or RADIUS.Inner),
 	}, instance)
 end
 
-local function addStroke(instance, color, transparency, thickness)
+local function addStroke(instance, transparency, color)
 	return create("UIStroke", {
-		Color = color or Vertex.Theme.Border,
-		Transparency = transparency or 0,
-		Thickness = thickness or 1,
+		Color = color or STROKE_COLOR,
+		Transparency = transparency or STROKE_SOFT,
+		Thickness = 1,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, instance)
 end
@@ -104,8 +148,12 @@ local function safeCall(callback, ...)
 	end
 end
 
-local function loadInter()
-	local fallback = Font.fromEnum(Enum.Font.BuilderSans)
+--=====================================================================
+-- Fonts: real Inter with proper weight hierarchy
+--=====================================================================
+
+local function buildFontFamily()
+	local fallback = "rbxasset://fonts/families/BuilderSans.json"
 	if
 		type(isfile) ~= "function"
 		or type(writefile) ~= "function"
@@ -116,9 +164,9 @@ local function loadInter()
 		return fallback
 	end
 
-	local success, font = pcall(function()
+	local success, family = pcall(function()
 		local directory = "VertexUI"
-		local ttfPath = directory .. "/Inter-SemiBold.ttf"
+		local ttfPath = directory .. "/Inter.ttf"
 		local fontPath = directory .. "/Inter.font"
 
 		if not isfolder(directory) then
@@ -131,32 +179,47 @@ local function loadInter()
 			)
 		end
 
-		local fontData = {
-			name = "Inter",
-			faces = {
-				{
-					name = "Regular",
-					weight = 600,
-					style = "normal",
-					assetId = getcustomasset(ttfPath),
-				},
-			},
-		}
-		writefile(fontPath, HttpService:JSONEncode(fontData))
-		return Font.new(getcustomasset(fontPath))
+		local assetId = getcustomasset(ttfPath)
+		local faces = {}
+		for _, weight in ipairs({ 400, 500, 600, 700 }) do
+			table.insert(faces, {
+				name = tostring(weight),
+				weight = weight,
+				style = "normal",
+				assetId = assetId,
+			})
+		end
+		writefile(fontPath, HttpService:JSONEncode({ name = "Inter", faces = faces }))
+		return getcustomasset(fontPath)
 	end)
 
-	return success and font or fallback
+	return success and family or fallback
 end
 
-Vertex.Font = loadInter()
+local FONT_FAMILY = buildFontFamily()
 
-local function textProperties(size, color)
+local function weightedFont(weightEnum)
+	local success, font = pcall(Font.new, FONT_FAMILY, weightEnum, Enum.FontStyle.Normal)
+	if success and font then
+		return font
+	end
+	return Font.fromEnum(Enum.Font.BuilderSans)
+end
+
+Vertex.Fonts = {
+	Regular = weightedFont(Enum.FontWeight.Regular),
+	Medium = weightedFont(Enum.FontWeight.Medium),
+	SemiBold = weightedFont(Enum.FontWeight.SemiBold),
+	Bold = weightedFont(Enum.FontWeight.Bold),
+}
+Vertex.Font = Vertex.Fonts.Medium -- backward compatibility
+
+local function textProps(size, color, font)
 	return {
 		BackgroundTransparency = 1,
-		FontFace = Vertex.Font,
+		FontFace = font or Vertex.Fonts.Medium,
 		TextColor3 = color or Vertex.Theme.Text,
-		TextSize = size or 13,
+		TextSize = size or TEXT.Body,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Center,
 	}
@@ -173,6 +236,10 @@ local function merge(base, extra)
 	return result
 end
 
+--=====================================================================
+-- Behaviour helpers
+--=====================================================================
+
 local function getGuiParent()
 	if type(gethui) == "function" then
 		local success, result = pcall(gethui)
@@ -184,7 +251,7 @@ local function getGuiParent()
 	return (player and player:FindFirstChildOfClass("PlayerGui")) or CoreGui
 end
 
-local function makeInteractive(button, normalColor, hoverColor, visual)
+local function hoverFill(button, normalColor, hoverColor, visual)
 	visual = visual or button
 	button.AutoButtonColor = false
 	connect(button.MouseEnter, function()
@@ -192,12 +259,6 @@ local function makeInteractive(button, normalColor, hoverColor, visual)
 	end)
 	connect(button.MouseLeave, function()
 		tween(visual, { BackgroundColor3 = normalColor }, fastAnimation)
-	end)
-	connect(button.MouseButton1Down, function()
-		tween(visual, { BackgroundTransparency = 0.18 }, fastAnimation)
-	end)
-	connect(button.MouseButton1Up, function()
-		tween(visual, { BackgroundTransparency = 0 }, fastAnimation)
 	end)
 end
 
@@ -246,27 +307,29 @@ local function makeDraggable(handle, target)
 	end)
 end
 
+-- A single, consistent control row shell used by every component.
 local function makeControl(section, height)
 	local row = create("Frame", {
 		Name = "Control",
 		BackgroundColor3 = Vertex.Theme.SurfaceRaised,
 		BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, height or 44),
+		Size = UDim2.new(1, 0, 0, height or SPACING.ControlH),
 		ClipsDescendants = true,
 	}, section.Container)
-	addCorner(row, 7)
-	addStroke(row, Vertex.Theme.BorderSoft, 0.35)
+	addCorner(row, RADIUS.Control)
+	addStroke(row, STROKE_SOFT)
 	return row
 end
 
 local function controlLabel(row, name, description)
 	local label = create(
 		"TextLabel",
-		merge(textProperties(13), {
+		merge(textProps(TEXT.Label, Vertex.Theme.Text, Vertex.Fonts.Medium), {
 			Name = "Label",
 			Text = name or "Control",
-			Position = UDim2.fromOffset(12, description and 6 or 0),
-			Size = UDim2.new(1, -24, description and 0 or 1, description and 20 or 0),
+			Position = UDim2.fromOffset(14, description and 7 or 0),
+			Size = UDim2.new(1, -28, description and 0 or 1, description and 18 or 0),
+			TextTruncate = Enum.TextTruncate.AtEnd,
 		}),
 		row
 	)
@@ -274,11 +337,11 @@ local function controlLabel(row, name, description)
 	if description then
 		create(
 			"TextLabel",
-			merge(textProperties(11, Vertex.Theme.TextMuted), {
+			merge(textProps(TEXT.Small, Vertex.Theme.TextMuted, Vertex.Fonts.Regular), {
 				Name = "Description",
 				Text = description,
-				Position = UDim2.fromOffset(12, 25),
-				Size = UDim2.new(1, -24, 0, 16),
+				Position = UDim2.fromOffset(14, 26),
+				Size = UDim2.new(1, -28, 0, 16),
 				TextTruncate = Enum.TextTruncate.AtEnd,
 			}),
 			row
@@ -287,6 +350,10 @@ local function controlLabel(row, name, description)
 	return label
 end
 
+--=====================================================================
+-- Public: theming
+--=====================================================================
+
 function Vertex:SetTheme(overrides)
 	for key, value in pairs(overrides or {}) do
 		if self.Theme[key] ~= nil and typeof(value) == "Color3" then
@@ -294,6 +361,10 @@ function Vertex:SetTheme(overrides)
 		end
 	end
 end
+
+--=====================================================================
+-- Public: windows
+--=====================================================================
 
 function Vertex:CreateWindow(options)
 	options = options or {}
@@ -314,81 +385,103 @@ function Vertex:CreateWindow(options)
 		Name = "Window",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = options.Size or UDim2.fromOffset(760, 500),
+		Size = options.Size or UDim2.fromOffset(640, 460),
 		BackgroundColor3 = Vertex.Theme.Background,
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
+		ZIndex = 2,
 	}, screenGui)
-	addCorner(main, 12)
-	addStroke(main, Vertex.Theme.Border, 0.1)
+	addCorner(main, RADIUS.Window)
+	addStroke(main, STROKE_STRONG)
 
-	local shadow = create("ImageLabel", {
+	-- Soft drop shadow.
+	create("ImageLabel", {
 		Name = "Shadow",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(1, 54, 1, 54),
+		Size = UDim2.new(1, 60, 1, 60),
 		BackgroundTransparency = 1,
 		Image = "rbxassetid://6014261993",
 		ImageColor3 = Color3.new(0, 0, 0),
-		ImageTransparency = 0.38,
+		ImageTransparency = 0.35,
 		ScaleType = Enum.ScaleType.Slice,
 		SliceCenter = Rect.new(49, 49, 450, 450),
-		ZIndex = 0,
+		ZIndex = 1,
+	}, screenGui)
+
+	-- Faint accent glow at the top, echoing the site's radial highlight.
+	create("ImageLabel", {
+		Name = "AccentGlow",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, -40),
+		Size = UDim2.fromOffset(420, 260),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://6014261993",
+		ImageColor3 = Vertex.Theme.Accent,
+		ImageTransparency = 0.86,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(49, 49, 450, 450),
+		ZIndex = 2,
 	}, main)
-	shadow.Parent = screenGui
-	main.ZIndex = 2
 
 	local sidebar = create("Frame", {
 		Name = "Sidebar",
 		BackgroundColor3 = Vertex.Theme.Surface,
 		BorderSizePixel = 0,
-		Size = UDim2.new(0, 190, 1, 0),
+		Size = UDim2.new(0, 176, 1, 0),
 		ZIndex = 3,
 	}, main)
 
 	create("Frame", {
 		Name = "Divider",
-		BackgroundColor3 = Vertex.Theme.BorderSoft,
+		BackgroundColor3 = STROKE_COLOR,
+		BackgroundTransparency = STROKE_SOFT,
 		BorderSizePixel = 0,
 		Position = UDim2.new(1, -1, 0, 0),
 		Size = UDim2.new(0, 1, 1, 0),
+		ZIndex = 3,
 	}, sidebar)
 
 	local header = create("Frame", {
 		Name = "Header",
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 78),
+		Size = UDim2.new(1, 0, 0, 74),
 		Active = true,
+		ZIndex = 3,
 	}, sidebar)
 
-	create("Frame", {
+	local brand = create("Frame", {
 		Name = "BrandMark",
 		BackgroundColor3 = Vertex.Theme.Accent,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(16, 21),
-		Size = UDim2.fromOffset(4, 35),
+		Position = UDim2.fromOffset(16, 20),
+		Size = UDim2.fromOffset(4, 34),
+		ZIndex = 4,
 	}, header)
+	addCorner(brand, RADIUS.Pill)
 
 	create(
 		"TextLabel",
-		merge(textProperties(16), {
+		merge(textProps(TEXT.Title, Vertex.Theme.Text, Vertex.Fonts.Bold), {
 			Name = "Title",
 			Text = options.Title or "Vertex",
-			Position = UDim2.fromOffset(30, 16),
-			Size = UDim2.new(1, -42, 0, 25),
+			Position = UDim2.fromOffset(30, 15),
+			Size = UDim2.new(1, -42, 0, 24),
 			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 4,
 		}),
 		header
 	)
 
 	create(
 		"TextLabel",
-		merge(textProperties(11, Vertex.Theme.TextMuted), {
+		merge(textProps(TEXT.Small, Vertex.Theme.TextMuted, Vertex.Fonts.Regular), {
 			Name = "Subtitle",
 			Text = options.Subtitle or "Interface library",
 			Position = UDim2.fromOffset(30, 39),
 			Size = UDim2.new(1, -42, 0, 18),
 			TextTruncate = Enum.TextTruncate.AtEnd,
+			ZIndex = 4,
 		}),
 		header
 	)
@@ -397,33 +490,56 @@ function Vertex:CreateWindow(options)
 		Name = "Tabs",
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(10, 78),
-		Size = UDim2.new(1, -20, 1, -128),
+		Position = UDim2.fromOffset(10, 74),
+		Size = UDim2.new(1, -20, 1, -118),
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		ScrollBarThickness = 0,
+		ZIndex = 3,
 	}, sidebar)
 	create("UIListLayout", {
-		Padding = UDim.new(0, 6),
+		Padding = UDim.new(0, 5),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, tabList)
 
+	-- Status pill + version, matching the site's online indicator.
+	local statusPill = create("Frame", {
+		Name = "Status",
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 16, 1, -34),
+		Size = UDim2.new(1, -32, 0, 20),
+		ZIndex = 3,
+	}, sidebar)
+
+	local statusDot = create("Frame", {
+		Name = "Dot",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0),
+		Size = UDim2.fromOffset(7, 7),
+		BackgroundColor3 = Vertex.Theme.Success,
+		BorderSizePixel = 0,
+		ZIndex = 3,
+	}, statusPill)
+	addCorner(statusDot, RADIUS.Pill)
+
 	create(
 		"TextLabel",
-		merge(textProperties(10, Vertex.Theme.TextDim), {
-			Name = "Footer",
-			Text = "VERTEX  •  " .. Vertex.Version,
-			Position = UDim2.new(0, 16, 1, -38),
-			Size = UDim2.new(1, -32, 0, 20),
+		merge(textProps(TEXT.Micro, Vertex.Theme.TextDim, Vertex.Fonts.SemiBold), {
+			Name = "StatusText",
+			Text = string.upper(options.Status or "Online") .. "  •  " .. Vertex.Version,
+			Position = UDim2.fromOffset(14, 0),
+			Size = UDim2.new(1, -14, 1, 0),
+			ZIndex = 3,
 		}),
-		sidebar
+		statusPill
 	)
 
 	local content = create("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(190, 0),
-		Size = UDim2.new(1, -190, 1, 0),
+		Position = UDim2.fromOffset(176, 0),
+		Size = UDim2.new(1, -176, 1, 0),
+		ZIndex = 3,
 	}, main)
 
 	local window = {
@@ -469,38 +585,38 @@ function Vertex:CreateWindow(options)
 		tabOptions = tabOptions or {}
 		local tabName = tabOptions.Name or "Tab"
 
-		local tabButton = create(
-			"TextButton",
-			merge(textProperties(13, Vertex.Theme.TextMuted), {
-				Name = tabName,
-				Text = "",
-				BackgroundColor3 = Vertex.Theme.Surface,
-				BorderSizePixel = 0,
-				Size = UDim2.new(1, 0, 0, 38),
-				AutoButtonColor = false,
-			}),
-			tabList
-		)
-		addCorner(tabButton, 7)
+		local tabButton = create("TextButton", {
+			Name = tabName,
+			Text = "",
+			BackgroundColor3 = Vertex.Theme.Surface,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 36),
+			AutoButtonColor = false,
+			ZIndex = 3,
+		}, tabList)
+		addCorner(tabButton, RADIUS.Inner)
 
 		local indicator = create("Frame", {
 			Name = "Indicator",
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 7, 0.5, 0),
-			Size = UDim2.fromOffset(3, 18),
+			Position = UDim2.new(0, 8, 0.5, 0),
+			Size = UDim2.fromOffset(3, 16),
 			BackgroundColor3 = Vertex.Theme.Accent,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
+			ZIndex = 4,
 		}, tabButton)
-		addCorner(indicator, 2)
+		addCorner(indicator, RADIUS.Pill)
 
 		local tabLabel = create(
 			"TextLabel",
-			merge(textProperties(13, Vertex.Theme.TextMuted), {
+			merge(textProps(TEXT.Label, Vertex.Theme.TextMuted, Vertex.Fonts.Medium), {
 				Text = tabName,
-				Position = UDim2.fromOffset(18, 0),
-				Size = UDim2.new(1, -28, 1, 0),
+				Position = UDim2.fromOffset(20, 0),
+				Size = UDim2.new(1, -30, 1, 0),
 				TextTruncate = Enum.TextTruncate.AtEnd,
+				ZIndex = 4,
 			}),
 			tabButton
 		)
@@ -510,17 +626,18 @@ function Vertex:CreateWindow(options)
 			Visible = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(18, 18),
-			Size = UDim2.new(1, -36, 1, -36),
+			Position = UDim2.fromOffset(SPACING.Window, SPACING.Window),
+			Size = UDim2.new(1, -SPACING.Window * 2, 1, -SPACING.Window * 2),
 			CanvasSize = UDim2.new(),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			ScrollBarThickness = 3,
-			ScrollBarImageColor3 = Vertex.Theme.Border,
-			ScrollBarImageTransparency = 0.25,
+			ScrollBarImageColor3 = STROKE_COLOR,
+			ScrollBarImageTransparency = 0.7,
+			ZIndex = 3,
 		}, content)
 		addPadding(page, 0, 6, 8, 0)
 		create("UIListLayout", {
-			Padding = UDim.new(0, 12),
+			Padding = UDim.new(0, SPACING.Gap),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}, page)
 
@@ -542,7 +659,8 @@ function Vertex:CreateWindow(options)
 				local selected = other == self
 				other.Page.Visible = selected
 				tween(other.Button, {
-					BackgroundColor3 = selected and Vertex.Theme.SurfaceRaised or Vertex.Theme.Surface,
+					BackgroundTransparency = selected and 0 or 1,
+					BackgroundColor3 = Vertex.Theme.SurfaceRaised,
 				})
 				tween(other.Label, {
 					TextColor3 = selected and Vertex.Theme.Text or Vertex.Theme.TextMuted,
@@ -550,6 +668,7 @@ function Vertex:CreateWindow(options)
 				tween(other.Indicator, {
 					BackgroundTransparency = selected and 0 or 1,
 				})
+				other.Label.FontFace = selected and Vertex.Fonts.SemiBold or Vertex.Fonts.Medium
 			end
 			window.CurrentTab = self
 		end
@@ -559,12 +678,12 @@ function Vertex:CreateWindow(options)
 		end)
 		connect(tabButton.MouseEnter, function()
 			if window.CurrentTab ~= tab then
-				tween(tabButton, { BackgroundColor3 = Vertex.Theme.SurfaceHover }, fastAnimation)
+				tween(tabButton, { BackgroundTransparency = 0.4 }, fastAnimation)
 			end
 		end)
 		connect(tabButton.MouseLeave, function()
 			if window.CurrentTab ~= tab then
-				tween(tabButton, { BackgroundColor3 = Vertex.Theme.Surface }, fastAnimation)
+				tween(tabButton, { BackgroundTransparency = 1 }, fastAnimation)
 			end
 		end)
 
@@ -576,18 +695,24 @@ function Vertex:CreateWindow(options)
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
+				ZIndex = 3,
 			}, page)
-			addCorner(sectionFrame, 9)
-			addStroke(sectionFrame, Vertex.Theme.BorderSoft, 0.2)
-			addPadding(sectionFrame, 12, 12, 12, 12)
+			addCorner(sectionFrame, RADIUS.Card)
+			addStroke(sectionFrame, STROKE_SOFT)
+			addPadding(sectionFrame, SPACING.Section, SPACING.Section, SPACING.Section, SPACING.Section)
+			create("UIListLayout", {
+				Padding = UDim.new(0, 10),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}, sectionFrame)
 
 			create(
 				"TextLabel",
-				merge(textProperties(12, Vertex.Theme.TextMuted), {
+				merge(textProps(TEXT.Micro, Vertex.Theme.TextDim, Vertex.Fonts.SemiBold), {
 					Name = "SectionTitle",
 					Text = string.upper(sectionOptions.Name or "SECTION"),
-					Size = UDim2.new(1, 0, 0, 20),
+					Size = UDim2.new(1, 0, 0, 14),
 					LayoutOrder = 0,
+					ZIndex = 3,
 				}),
 				sectionFrame
 			)
@@ -598,15 +723,12 @@ function Vertex:CreateWindow(options)
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				LayoutOrder = 1,
+				ZIndex = 3,
 			}, sectionFrame)
-			create("UIListLayout", {
-				Padding = UDim.new(0, 7),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}, sectionContainer)
 			create("UIListLayout", {
 				Padding = UDim.new(0, 8),
 				SortOrder = Enum.SortOrder.LayoutOrder,
-			}, sectionFrame)
+			}, sectionContainer)
 
 			local section = {
 				Name = sectionOptions.Name or "Section",
@@ -615,13 +737,14 @@ function Vertex:CreateWindow(options)
 				Tab = tab,
 			}
 
-			function section:AddLabel(options)
-				if type(options) == "string" then
-					options = { Text = options }
+			function section:AddLabel(labelOptions)
+				if type(labelOptions) == "string" then
+					labelOptions = { Text = labelOptions }
 				end
-				options = options or {}
-				local row = makeControl(self, options.Description and 54 or 40)
-				local label = controlLabel(row, options.Text or options.Name or "Label", options.Description)
+				labelOptions = labelOptions or {}
+				local row = makeControl(self, labelOptions.Description and 52 or 40)
+				local label =
+					controlLabel(row, labelOptions.Text or labelOptions.Name or "Label", labelOptions.Description)
 				local control = { Instance = row, Label = label }
 				function control:Set(text)
 					label.Text = tostring(text)
@@ -629,86 +752,91 @@ function Vertex:CreateWindow(options)
 				return control
 			end
 
-			function section:AddButton(options)
-				options = options or {}
-				local row = makeControl(self, options.Description and 54 or 44)
+			function section:AddButton(buttonOptions)
+				buttonOptions = buttonOptions or {}
+				local row = makeControl(self, buttonOptions.Description and 52 or SPACING.ControlH)
 				local button = create("TextButton", {
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					Size = UDim2.fromScale(1, 1),
 					Text = "",
 					AutoButtonColor = false,
+					ZIndex = 3,
 				}, row)
-				controlLabel(button, options.Name or "Button", options.Description)
+				controlLabel(button, buttonOptions.Name or "Button", buttonOptions.Description)
 				local action = create(
 					"TextLabel",
-					merge(textProperties(16, Vertex.Theme.TextMuted), {
+					merge(textProps(TEXT.Value, Vertex.Theme.TextDim, Vertex.Fonts.SemiBold), {
 						Text = "›",
 						TextXAlignment = Enum.TextXAlignment.Center,
 						AnchorPoint = Vector2.new(1, 0.5),
-						Position = UDim2.new(1, -11, 0.5, 0),
-						Size = UDim2.fromOffset(24, 24),
+						Position = UDim2.new(1, -12, 0.5, 0),
+						Size = UDim2.fromOffset(22, 22),
+						ZIndex = 3,
 					}),
 					button
 				)
-				makeInteractive(button, Vertex.Theme.SurfaceRaised, Vertex.Theme.SurfaceHover, row)
+				hoverFill(button, Vertex.Theme.SurfaceRaised, Vertex.Theme.SurfaceHover, row)
 				connect(button.MouseButton1Click, function()
 					tween(action, { TextColor3 = Vertex.Theme.Accent }, fastAnimation)
 					task.delay(0.15, function()
 						if action.Parent then
-							tween(action, { TextColor3 = Vertex.Theme.TextMuted }, fastAnimation)
+							tween(action, { TextColor3 = Vertex.Theme.TextDim }, fastAnimation)
 						end
 					end)
-					safeCall(options.Callback)
+					safeCall(buttonOptions.Callback)
 				end)
 				return {
 					Instance = row,
 					Press = function()
-						safeCall(options.Callback)
+						safeCall(buttonOptions.Callback)
 					end,
 				}
 			end
 
-			function section:AddToggle(options)
-				options = options or {}
-				local flag = options.Flag or options.Name or HttpService:GenerateGUID(false)
-				local value = options.Default == true
+			function section:AddToggle(toggleOptions)
+				toggleOptions = toggleOptions or {}
+				local flag = toggleOptions.Flag or toggleOptions.Name or HttpService:GenerateGUID(false)
+				local value = toggleOptions.Default == true
 				Vertex.Flags[flag] = value
 
-				local row = makeControl(self, options.Description and 54 or 44)
-				controlLabel(row, options.Name or "Toggle", options.Description)
+				local row = makeControl(self, toggleOptions.Description and 52 or SPACING.ControlH)
+				controlLabel(row, toggleOptions.Name or "Toggle", toggleOptions.Description)
 				local track = create("TextButton", {
 					Name = "Toggle",
 					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.new(1, -12, 0.5, 0),
-					Size = UDim2.fromOffset(38, 22),
-					BackgroundColor3 = value and Vertex.Theme.Accent or Vertex.Theme.Border,
+					Position = UDim2.new(1, -14, 0.5, 0),
+					Size = UDim2.fromOffset(40, 22),
+					BackgroundColor3 = value and Vertex.Theme.Accent or Vertex.Theme.SurfaceHover,
 					BorderSizePixel = 0,
 					Text = "",
 					AutoButtonColor = false,
+					ZIndex = 3,
 				}, row)
-				addCorner(track, 11)
+				addCorner(track, RADIUS.Pill)
+				addStroke(track, STROKE_SOFT)
 				local knob = create("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
-					Position = value and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+					Position = value and UDim2.new(0, 21, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
 					Size = UDim2.fromOffset(16, 16),
-					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundColor3 = Vertex.Theme.Knob,
 					BorderSizePixel = 0,
+					ZIndex = 4,
 				}, track)
-				addCorner(knob, 8)
+				addCorner(knob, RADIUS.Pill)
 
 				local control = { Instance = row, Flag = flag, Value = value }
 				function control:Set(newValue, silent)
 					self.Value = newValue == true
 					Vertex.Flags[flag] = self.Value
 					tween(track, {
-						BackgroundColor3 = self.Value and Vertex.Theme.Accent or Vertex.Theme.Border,
+						BackgroundColor3 = self.Value and Vertex.Theme.Accent or Vertex.Theme.SurfaceHover,
 					})
 					tween(knob, {
-						Position = self.Value and UDim2.new(1, -19, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
+						Position = self.Value and UDim2.new(0, 21, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
 					})
 					if not silent then
-						safeCall(options.Callback, self.Value)
+						safeCall(toggleOptions.Callback, self.Value)
 					end
 				end
 				connect(track.MouseButton1Click, function()
@@ -717,43 +845,46 @@ function Vertex:CreateWindow(options)
 				return control
 			end
 
-			function section:AddSlider(options)
-				options = options or {}
-				local minimum = tonumber(options.Min) or 0
-				local maximum = tonumber(options.Max) or 100
-				local step = tonumber(options.Step) or 1
-				local flag = options.Flag or options.Name or HttpService:GenerateGUID(false)
-				local value = math.clamp(tonumber(options.Default) or minimum, minimum, maximum)
+			function section:AddSlider(sliderOptions)
+				sliderOptions = sliderOptions or {}
+				local minimum = tonumber(sliderOptions.Min) or 0
+				local maximum = tonumber(sliderOptions.Max) or 100
+				local step = tonumber(sliderOptions.Step) or 1
+				local flag = sliderOptions.Flag or sliderOptions.Name or HttpService:GenerateGUID(false)
+				local value = math.clamp(tonumber(sliderOptions.Default) or minimum, minimum, maximum)
 				Vertex.Flags[flag] = value
 
-				local row = makeControl(self, 64)
-				controlLabel(row, options.Name or "Slider")
+				local row = makeControl(self, 60)
+				controlLabel(row, sliderOptions.Name or "Slider")
 				local valueLabel = create(
 					"TextLabel",
-					merge(textProperties(12, Vertex.Theme.TextMuted), {
-						Text = tostring(value) .. (options.Suffix or ""),
+					merge(textProps(TEXT.Body, Vertex.Theme.AccentText, Vertex.Fonts.SemiBold), {
+						Text = tostring(value) .. (sliderOptions.Suffix or ""),
 						TextXAlignment = Enum.TextXAlignment.Right,
 						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.new(1, -12, 0, 0),
-						Size = UDim2.fromOffset(90, 38),
+						Position = UDim2.new(1, -14, 0, 0),
+						Size = UDim2.fromOffset(90, 34),
+						ZIndex = 3,
 					}),
 					row
 				)
 				local track = create("TextButton", {
-					Position = UDim2.new(0, 12, 1, -18),
-					Size = UDim2.new(1, -24, 0, 5),
-					BackgroundColor3 = Vertex.Theme.Border,
+					Position = UDim2.new(0, 14, 1, -16),
+					Size = UDim2.new(1, -28, 0, 6),
+					BackgroundColor3 = Vertex.Theme.SurfaceHover,
 					BorderSizePixel = 0,
 					Text = "",
 					AutoButtonColor = false,
+					ZIndex = 3,
 				}, row)
-				addCorner(track, 3)
+				addCorner(track, RADIUS.Pill)
 				local fill = create("Frame", {
 					Size = UDim2.fromScale((value - minimum) / math.max(maximum - minimum, 1), 1),
 					BackgroundColor3 = Vertex.Theme.Accent,
 					BorderSizePixel = 0,
+					ZIndex = 4,
 				}, track)
-				addCorner(fill, 3)
+				addCorner(fill, RADIUS.Pill)
 
 				local control = { Instance = row, Flag = flag, Value = value }
 				function control:Set(newValue, silent)
@@ -761,12 +892,12 @@ function Vertex:CreateWindow(options)
 					newValue = math.floor((newValue / step) + 0.5) * step
 					self.Value = newValue
 					Vertex.Flags[flag] = newValue
-					valueLabel.Text = tostring(newValue) .. (options.Suffix or "")
+					valueLabel.Text = tostring(newValue) .. (sliderOptions.Suffix or "")
 					tween(fill, {
 						Size = UDim2.fromScale((newValue - minimum) / math.max(maximum - minimum, 1), 1),
 					}, fastAnimation)
 					if not silent then
-						safeCall(options.Callback, newValue)
+						safeCall(sliderOptions.Callback, newValue)
 					end
 				end
 
@@ -810,99 +941,108 @@ function Vertex:CreateWindow(options)
 				return control
 			end
 
-			function section:AddInput(options)
-				options = options or {}
-				local flag = options.Flag or options.Name or HttpService:GenerateGUID(false)
-				local value = tostring(options.Default or "")
+			function section:AddInput(inputOptions)
+				inputOptions = inputOptions or {}
+				local flag = inputOptions.Flag or inputOptions.Name or HttpService:GenerateGUID(false)
+				local value = tostring(inputOptions.Default or "")
 				Vertex.Flags[flag] = value
 
-				local row = makeControl(self, 64)
-				controlLabel(row, options.Name or "Input")
+				local row = makeControl(self, 62)
+				controlLabel(row, inputOptions.Name or "Input")
 				local input = create(
 					"TextBox",
-					merge(textProperties(12), {
-						Position = UDim2.new(0, 12, 1, -28),
-						Size = UDim2.new(1, -24, 0, 22),
+					merge(textProps(TEXT.Body, Vertex.Theme.Text, Vertex.Fonts.Regular), {
+						Position = UDim2.new(0, 14, 1, -28),
+						Size = UDim2.new(1, -28, 0, 24),
 						BackgroundColor3 = Vertex.Theme.Background,
 						BorderSizePixel = 0,
 						Text = value,
-						PlaceholderText = options.Placeholder or "Enter a value...",
+						PlaceholderText = inputOptions.Placeholder or "Enter a value...",
 						PlaceholderColor3 = Vertex.Theme.TextDim,
 						ClearTextOnFocus = false,
 						TextTruncate = Enum.TextTruncate.AtEnd,
+						ZIndex = 3,
 					}),
 					row
 				)
-				addCorner(input, 5)
-				addStroke(input, Vertex.Theme.BorderSoft, 0.25)
-				addPadding(input, 0, 8, 0, 8)
+				addCorner(input, RADIUS.Inner)
+				addStroke(input, STROKE_SOFT)
+				addPadding(input, 0, 10, 0, 10)
 
+				local inputStroke = input:FindFirstChildOfClass("UIStroke")
 				local control = { Instance = row, Input = input, Flag = flag, Value = value }
 				function control:Set(newValue, silent)
 					self.Value = tostring(newValue or "")
 					input.Text = self.Value
 					Vertex.Flags[flag] = self.Value
 					if not silent then
-						safeCall(options.Callback, self.Value)
+						safeCall(inputOptions.Callback, self.Value)
 					end
 				end
 				connect(input.Focused, function()
-					tween(input, { BackgroundColor3 = Vertex.Theme.SurfaceHover }, fastAnimation)
+					if inputStroke then
+						tween(inputStroke, { Transparency = 0.4, Color = Vertex.Theme.Accent }, fastAnimation)
+					end
 				end)
 				connect(input.FocusLost, function(enterPressed)
-					tween(input, { BackgroundColor3 = Vertex.Theme.Background }, fastAnimation)
+					if inputStroke then
+						tween(inputStroke, { Transparency = STROKE_SOFT, Color = STROKE_COLOR }, fastAnimation)
+					end
 					control:Set(input.Text)
 					if enterPressed then
-						safeCall(options.OnEnter, input.Text)
+						safeCall(inputOptions.OnEnter, input.Text)
 					end
 				end)
 				return control
 			end
 
-			function section:AddDropdown(options)
-				options = options or {}
-				local items = options.Items or {}
-				local flag = options.Flag or options.Name or HttpService:GenerateGUID(false)
-				local selected = options.Default
+			function section:AddDropdown(dropdownOptions)
+				dropdownOptions = dropdownOptions or {}
+				local items = dropdownOptions.Items or {}
+				local flag = dropdownOptions.Flag or dropdownOptions.Name or HttpService:GenerateGUID(false)
+				local selected = dropdownOptions.Default
 				Vertex.Flags[flag] = selected
 
-				local row = makeControl(self, 64)
+				local row = makeControl(self, 62)
 				row.ClipsDescendants = true
-				controlLabel(row, options.Name or "Dropdown")
+				controlLabel(row, dropdownOptions.Name or "Dropdown")
 				local selector = create(
 					"TextButton",
-					merge(textProperties(12), {
-						Position = UDim2.new(0, 12, 0, 34),
-						Size = UDim2.new(1, -24, 0, 23),
+					merge(textProps(TEXT.Body, Vertex.Theme.Text, Vertex.Fonts.Regular), {
+						Position = UDim2.new(0, 14, 0, 32),
+						Size = UDim2.new(1, -28, 0, 24),
 						BackgroundColor3 = Vertex.Theme.Background,
 						BorderSizePixel = 0,
-						Text = selected and tostring(selected) or (options.Placeholder or "Select..."),
+						Text = selected and tostring(selected) or (dropdownOptions.Placeholder or "Select..."),
 						TextColor3 = selected and Vertex.Theme.Text or Vertex.Theme.TextDim,
 						AutoButtonColor = false,
+						ZIndex = 3,
 					}),
 					row
 				)
-				addCorner(selector, 5)
-				addStroke(selector, Vertex.Theme.BorderSoft, 0.25)
-				addPadding(selector, 0, 24, 0, 8)
+				addCorner(selector, RADIUS.Inner)
+				addStroke(selector, STROKE_SOFT)
+				addPadding(selector, 0, 28, 0, 10)
 
-				create(
+				local chevron = create(
 					"TextLabel",
-					merge(textProperties(13, Vertex.Theme.TextMuted), {
+					merge(textProps(TEXT.Body, Vertex.Theme.TextMuted, Vertex.Fonts.SemiBold), {
 						Text = "⌄",
 						TextXAlignment = Enum.TextXAlignment.Center,
 						AnchorPoint = Vector2.new(1, 0),
-						Position = UDim2.new(1, 0, 0, 0),
-						Size = UDim2.fromOffset(24, 23),
+						Position = UDim2.new(1, -2, 0, -1),
+						Size = UDim2.fromOffset(22, 24),
+						ZIndex = 3,
 					}),
 					selector
 				)
 
 				local optionsHolder = create("Frame", {
 					BackgroundTransparency = 1,
-					Position = UDim2.fromOffset(12, 63),
-					Size = UDim2.new(1, -24, 0, 0),
+					Position = UDim2.fromOffset(14, 62),
+					Size = UDim2.new(1, -28, 0, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
+					ZIndex = 3,
 				}, row)
 				create("UIListLayout", {
 					Padding = UDim.new(0, 4),
@@ -920,16 +1060,19 @@ function Vertex:CreateWindow(options)
 				function control:Set(newValue, silent)
 					self.Value = newValue
 					Vertex.Flags[flag] = newValue
-					selector.Text = newValue ~= nil and tostring(newValue) or (options.Placeholder or "Select...")
+					selector.Text = newValue ~= nil and tostring(newValue)
+						or (dropdownOptions.Placeholder or "Select...")
 					selector.TextColor3 = newValue ~= nil and Vertex.Theme.Text or Vertex.Theme.TextDim
 					if not silent then
-						safeCall(options.Callback, newValue)
+						safeCall(dropdownOptions.Callback, newValue)
 					end
 				end
 
 				function control:SetOpen(open)
 					self.Open = open == true
-					local height = self.Open and (#self.Items * 31 + math.max(#self.Items - 1, 0) * 4 + 70) or 64
+					local rows = #self.Items
+					local height = self.Open and (rows * 30 + math.max(rows - 1, 0) * 4 + 68) or 62
+					tween(chevron, { Rotation = self.Open and 180 or 0 }, fastAnimation)
 					tween(row, { Size = UDim2.new(1, 0, 0, height) })
 				end
 
@@ -943,18 +1086,19 @@ function Vertex:CreateWindow(options)
 					for _, item in ipairs(self.Items) do
 						local option = create(
 							"TextButton",
-							merge(textProperties(12), {
+							merge(textProps(TEXT.Body, Vertex.Theme.TextMuted, Vertex.Fonts.Regular), {
 								BackgroundColor3 = Vertex.Theme.Background,
 								BorderSizePixel = 0,
-								Size = UDim2.new(1, 0, 0, 31),
+								Size = UDim2.new(1, 0, 0, 30),
 								Text = tostring(item),
 								AutoButtonColor = false,
+								ZIndex = 3,
 							}),
 							optionsHolder
 						)
-						addCorner(option, 5)
-						addPadding(option, 0, 8, 0, 8)
-						makeInteractive(option, Vertex.Theme.Background, Vertex.Theme.SurfaceHover)
+						addCorner(option, RADIUS.Inner)
+						addPadding(option, 0, 10, 0, 10)
+						hoverFill(option, Vertex.Theme.Background, Vertex.Theme.SurfaceHover)
 						connect(option.MouseButton1Click, function()
 							control:Set(item)
 							control:SetOpen(false)
@@ -972,30 +1116,31 @@ function Vertex:CreateWindow(options)
 				return control
 			end
 
-			function section:AddKeybind(options)
-				options = options or {}
-				local flag = options.Flag or options.Name or HttpService:GenerateGUID(false)
-				local value = options.Default or Enum.KeyCode.Unknown
+			function section:AddKeybind(keybindOptions)
+				keybindOptions = keybindOptions or {}
+				local flag = keybindOptions.Flag or keybindOptions.Name or HttpService:GenerateGUID(false)
+				local value = keybindOptions.Default or Enum.KeyCode.Unknown
 				Vertex.Flags[flag] = value
 
-				local row = makeControl(self, options.Description and 54 or 44)
-				controlLabel(row, options.Name or "Keybind", options.Description)
+				local row = makeControl(self, keybindOptions.Description and 52 or SPACING.ControlH)
+				controlLabel(row, keybindOptions.Name or "Keybind", keybindOptions.Description)
 				local bindButton = create(
 					"TextButton",
-					merge(textProperties(11), {
+					merge(textProps(TEXT.Small, Vertex.Theme.TextMuted, Vertex.Fonts.SemiBold), {
 						AnchorPoint = Vector2.new(1, 0.5),
-						Position = UDim2.new(1, -12, 0.5, 0),
-						Size = UDim2.fromOffset(88, 26),
+						Position = UDim2.new(1, -14, 0.5, 0),
+						Size = UDim2.fromOffset(84, 26),
 						BackgroundColor3 = Vertex.Theme.Background,
 						BorderSizePixel = 0,
 						Text = value.Name,
 						TextXAlignment = Enum.TextXAlignment.Center,
 						AutoButtonColor = false,
+						ZIndex = 3,
 					}),
 					row
 				)
-				addCorner(bindButton, 5)
-				addStroke(bindButton, Vertex.Theme.BorderSoft, 0.25)
+				addCorner(bindButton, RADIUS.Inner)
+				addStroke(bindButton, STROKE_SOFT)
 
 				local listening = false
 				local control = { Instance = row, Flag = flag, Value = value }
@@ -1007,21 +1152,23 @@ function Vertex:CreateWindow(options)
 					Vertex.Flags[flag] = newValue
 					bindButton.Text = newValue.Name
 					if not silent then
-						safeCall(options.Callback, newValue)
+						safeCall(keybindOptions.Callback, newValue)
 					end
 				end
 				connect(bindButton.MouseButton1Click, function()
 					listening = true
 					bindButton.Text = "..."
+					bindButton.TextColor3 = Vertex.Theme.AccentText
 					tween(bindButton, { BackgroundColor3 = Vertex.Theme.SurfaceHover })
 				end)
 				connect(UserInputService.InputBegan, function(input)
 					if listening and input.KeyCode ~= Enum.KeyCode.Unknown then
 						listening = false
+						bindButton.TextColor3 = Vertex.Theme.TextMuted
 						control:Set(input.KeyCode)
 						tween(bindButton, { BackgroundColor3 = Vertex.Theme.Background })
 					elseif not listening and input.KeyCode == control.Value then
-						safeCall(options.Pressed)
+						safeCall(keybindOptions.Pressed)
 					end
 				end)
 				return control
@@ -1041,6 +1188,10 @@ function Vertex:CreateWindow(options)
 	table.insert(self.Windows, window)
 	return window
 end
+
+--=====================================================================
+-- Public: notifications
+--=====================================================================
 
 function Vertex:Notify(options)
 	if type(options) == "string" then
@@ -1063,7 +1214,7 @@ function Vertex:Notify(options)
 			Size = UDim2.fromOffset(310, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
-			ZIndex = 50,
+			ZIndex = 60,
 		}, parent.ScreenGui)
 		create("UIListLayout", {
 			Padding = UDim.new(0, 8),
@@ -1076,55 +1227,69 @@ function Vertex:Notify(options)
 		BackgroundColor3 = self.Theme.Surface,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Size = UDim2.fromOffset(300, options.Description and 72 or 54),
+		Size = UDim2.fromOffset(300, options.Description and 70 or 52),
 		Position = UDim2.fromOffset(24, 0),
-		ZIndex = 51,
+		ZIndex = 61,
 	}, holder)
-	addCorner(notification, 8)
-	addStroke(notification, self.Theme.Border, 0.15)
+	addCorner(notification, RADIUS.Card)
+	local notifStroke = addStroke(notification, 1)
 
-	create("Frame", {
+	local accentBar = create("Frame", {
 		BackgroundColor3 = options.Color or self.Theme.Accent,
+		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(0, 10),
-		Size = UDim2.new(0, 3, 1, -20),
-		ZIndex = 52,
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.new(0, 3, 1, -24),
+		ZIndex = 62,
 	}, notification)
+	addCorner(accentBar, RADIUS.Pill)
 
-	create(
+	local title = create(
 		"TextLabel",
-		merge(textProperties(13), {
+		merge(textProps(TEXT.Label, self.Theme.Text, self.Fonts.SemiBold), {
 			Text = options.Title or "Notification",
-			Position = UDim2.fromOffset(15, options.Description and 9 or 0),
-			Size = UDim2.new(1, -28, options.Description and 0 or 1, options.Description and 22 or 0),
-			ZIndex = 52,
+			TextTransparency = 1,
+			Position = UDim2.fromOffset(24, options.Description and 10 or 0),
+			Size = UDim2.new(1, -36, options.Description and 0 or 1, options.Description and 20 or 0),
+			ZIndex = 62,
 		}),
 		notification
 	)
 
+	local body
 	if options.Description then
-		create(
+		body = create(
 			"TextLabel",
-			merge(textProperties(11, self.Theme.TextMuted), {
+			merge(textProps(TEXT.Small, self.Theme.TextMuted, self.Fonts.Regular), {
 				Text = options.Description,
-				Position = UDim2.fromOffset(15, 31),
-				Size = UDim2.new(1, -28, 0, 30),
+				TextTransparency = 1,
+				Position = UDim2.fromOffset(24, 30),
+				Size = UDim2.new(1, -36, 0, 30),
 				TextWrapped = true,
 				TextYAlignment = Enum.TextYAlignment.Top,
-				ZIndex = 52,
+				ZIndex = 62,
 			}),
 			notification
 		)
 	end
 
-	tween(notification, {
-		BackgroundTransparency = 0,
-		Position = UDim2.fromOffset(0, 0),
-	})
+	tween(notification, { BackgroundTransparency = 0, Position = UDim2.fromOffset(0, 0) })
+	tween(notifStroke, { Transparency = STROKE_SOFT })
+	tween(accentBar, { BackgroundTransparency = 0 })
+	tween(title, { TextTransparency = 0 })
+	if body then
+		tween(body, { TextTransparency = 0 })
+	end
 
 	task.delay(options.Duration or 3, function()
 		if not notification.Parent then
 			return
+		end
+		tween(notifStroke, { Transparency = 1 })
+		tween(accentBar, { BackgroundTransparency = 1 })
+		tween(title, { TextTransparency = 1 })
+		if body then
+			tween(body, { TextTransparency = 1 })
 		end
 		local closing = tween(notification, {
 			BackgroundTransparency = 1,
@@ -1136,6 +1301,10 @@ function Vertex:Notify(options)
 
 	return notification
 end
+
+--=====================================================================
+-- Public: teardown
+--=====================================================================
 
 function Vertex:Destroy()
 	for _, window in ipairs(self.Windows) do
