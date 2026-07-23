@@ -1210,6 +1210,7 @@ function Vertex:CreateWindow(options)
 					row
 				)
 				addCorner(field, RADIUS.Inner)
+				local fieldStroke = addStroke(field, STROKE_SOFT)
 				addPadding(field, 0, 12, 0, 12)
 
 				local control = { Instance = row, Input = field, Flag = flag, Value = value }
@@ -1222,10 +1223,12 @@ function Vertex:CreateWindow(options)
 					end
 				end
 				connect(field.Focused, function()
-					motion(field, "BackgroundColor3", Vertex.Theme.SurfaceHover, 22)
+					motion(fieldStroke, "Transparency", 0.25, 22)
+					motion(fieldStroke, "Color", Vertex.Theme.Accent, 22)
 				end)
 				connect(field.FocusLost, function(enterPressed)
-					motion(field, "BackgroundColor3", Vertex.Theme.Background, 22)
+					motion(fieldStroke, "Transparency", STROKE_SOFT, 22)
+					motion(fieldStroke, "Color", STROKE_COLOR, 22)
 					if inputOptions.Numeric and not tonumber(field.Text) then
 						field.Text = self.Value
 						return
@@ -1266,6 +1269,7 @@ function Vertex:CreateWindow(options)
 					row
 				)
 				addCorner(selector, RADIUS.Inner)
+				addStroke(selector, STROKE_SOFT)
 				addPadding(selector, 0, 34, 0, 12)
 
 				local chevron = makeGlyph(selector, "chevron-down", "⌄", 16, Vertex.Theme.TextMuted)
@@ -1399,6 +1403,7 @@ function Vertex:CreateWindow(options)
 					row
 				)
 				addCorner(bindButton, RADIUS.Inner)
+				addStroke(bindButton, STROKE_SOFT)
 
 				local listening = false
 				local control = { Instance = row, Flag = flag, Value = value }
