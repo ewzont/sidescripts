@@ -437,7 +437,8 @@ local function makeControl(section, height)
 		ZIndex = 3,
 	}, section.Container)
 	addCorner(row, RADIUS.Control)
-	addStroke(row, STROKE_SOFT)
+	-- No stroke on control rows: the raised background already separates them,
+	-- and stacking a stroke inside the section card looks like boxes-in-boxes.
 	return row
 end
 
@@ -982,7 +983,6 @@ function Vertex:CreateWindow(options)
 					ZIndex = 3,
 				}, row)
 				addCorner(track, RADIUS.Pill)
-				addStroke(track, STROKE_SOFT)
 				local knob = create("Frame", {
 					AnchorPoint = Vector2.new(0, 0.5),
 					Position = value and UDim2.new(0, 22, 0.5, 0) or UDim2.new(0, 3, 0.5, 0),
